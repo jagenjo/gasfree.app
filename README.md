@@ -230,7 +230,7 @@ A small digital / analog hybrid with a flat touch keyboard: a digital oscillator
 
 ## Para D
 
-A classic analog synthesizer design with four oscillators, played as one voice or as four (its type in saved racks is `pollyd`). Its panel: black with white print, black knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
+A classic analog synthesizer design with four oscillators, played as one voice or as four (its type in saved racks is `pollyd`). Its panel follows the original's layout: charcoal with white print, sections CONTROLLERS, OSCILLATOR BANK, MIXER, MODIFIERS (the filter's switches, FILTER and LOUDNESS CONTOUR, DISTORTION, CHORUS) and OUTPUT, named along the bottom; black knobs with numbered scales; horizontal rocker switches (vertical for OSC 4 CONTROL and the noise's WHITE / PINK), a three-way MODE slide, yellow chorus I / II buttons; wooden sides. A switch that is on is in its full colour with its red light lit; off, it is dark and dull. Two-way switches (FILTER MODE LO / HI, the modulation sources) light the side chosen. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
 
 - **Controllers:**
   - TUNE, GLIDE (with its ON switch on the deck), MODULATION MIX.

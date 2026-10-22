@@ -1,8 +1,9 @@
 // devices/pollyd.js
 // PARA D module, a four-oscillator, four-voice paraphonic analog synthesizer in the classic style. Its
-// panel is laid out as the original's tilted front: CONTROLLERS, OSCILLATOR BANK, MIXER, MODIFIERS and
-// OUTPUT (with the chorus and the distortion), black with white print, black knobs with numbered
-// scales, blue and orange rocker switches. Below, on the keyboard deck: the pitch and mod wheels, glide,
+// panel is laid out as the original's tilted front (positions measured on it): CONTROLLERS, OSCILLATOR
+// BANK, MIXER, MODIFIERS (the filter's switches, FILTER, LOUDNESS CONTOUR, DISTORTION, CHORUS) and
+// OUTPUT, charcoal with white print, black knobs with numbered scales, rocker switches horizontal or
+// vertical as on the original (on: full colour and a light; off: dark). Below, on the keyboard deck: the pitch and mod wheels, glide,
 // LFO and transpose, the sequencer / arpeggiator, and the CV sockets of its back panel. Wooden sides.
 // DSP in pollyd-worklet.js.
 
@@ -10,7 +11,7 @@
 
 var SIZE = [1568, 700];
 var DECK_Y = 496;                       // the keyboard deck under the tilted panel
-var BLUE = "#2f6db5", ORANGE = "#e2741f", WHITE = "#e9e6de", INK = "#f2f0ea", DIM = "#8d8a83";
+var BLUE = "#4fb6d8", ORANGE = "#ef6a22", WHITE = "#e9e6de", GREEN = "#8fd04a", INK = "#f2f0ea", DIM = "#8d8a83";
 var RANGES = ["LO", "32'", "16'", "8'", "4'", "2'"];
 var ARP_NAMES = ["UP", "DOWN", "INC", "EXC", "RANDOM", "ORDER", "UP 2 OCT", "DOWN 2 OCT"];
 var MODES = ["mono", "unison", "poly"];
@@ -188,22 +189,84 @@ function glyph( kind, x, y, color )
 	ctx.stroke();
 }
 
-// a rocker switch: on = the top half pressed in. caption above, its state below
-function rocker( id, cx, cy, on, color, caption, onText, offText, tooltip )
+// a rocker switch, horizontal (as most on the original) or vertical. On: its full colour, the "on" half
+// pressed in, a light beside it. Off: the same colour, dark and dull. caption above; onText / offText:
+// what each half means (two-way switches: the side that is pressed is lit, the other dim)
+function rocker( id, cx, cy, on, color, caption, onText, offText, tooltip, vertical )
 {
-	var w = 18, h = 30, x = cx - w / 2, y = cy - h / 2;
+	var w = vertical ? 22 : 48, h = vertical ? 48 : 22, x = cx - w / 2, y = cy - h / 2;
 	var r = hot( id, x - 4, y - 4, w + 8, h + 8 );
 	if(r.clicked) on = !on;
-	if(caption) caption.split( "\n" ).forEach(function(l, i, a){ T( l, cx, y - 9 - (a.length - 1 - i) * 10, 8 ); });
-	ctx.fillStyle = "#050505"; ctx.fillRect( x - 3, y - 3, w + 6, h + 6 );
+	var two = !!(onText && offText);  // a choice between two things, not an on / off
+	var lit = on || two;
+	if(caption) caption.split( "\n" ).forEach(function(l, i, a){ T( l, cx, y - 8 - (a.length - 1 - i) * 10, 8 ); });
+	ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 3 ); ctx.fill();
+	var base = lit ? color : shade( color, -0.68 );
+	var g = vertical ? ctx.createLinearGradient( 0, y, 0, y + h ) : ctx.createLinearGradient( x, 0, x + w, 0 );
+	var pressedFirst = vertical ? on : !on;  // vertical: on = the top pressed; horizontal: on = the right pressed
+	var dark = shade( base, -0.45 ), light = shade( base, r.hover ? 0.3 : 0.15 );
+	if(pressedFirst) { g.addColorStop( 0, dark ); g.addColorStop( 0.5, base ); g.addColorStop( 0.52, light ); g.addColorStop( 1, base ); }
+	else { g.addColorStop( 0, base ); g.addColorStop( 0.48, light ); g.addColorStop( 0.5, base ); g.addColorStop( 1, dark ); }
+	ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect( x, y, w, h, 2 ); ctx.fill();
+	if(lit) { ctx.fillStyle = "rgba(255,255,255,0.22)"; if(vertical) ctx.fillRect( x + 3, on ? y + h / 2 + 3 : y + 3, w - 6, 2 ); else ctx.fillRect( on ? x + 3 : x + w / 2 + 3, y + 3, w / 2 - 6, 2 ); }
+	if(two)
+	{
+		// the two meanings at its ends, the one chosen lit
+		if(vertical) { T( onText, cx, y - 8, 7, on ? INK : DIM, "center", on ); T( offText, cx, y + h + 9, 7, on ? DIM : INK, "center", !on ); }
+		else { T( offText, x + 2, y + h + 9, 7, on ? DIM : INK, "left", !on ); T( onText, x + w - 2, y + h + 9, 7, on ? INK : DIM, "right", on ); }
+	}
+	else if(onText !== null)
+	{
+		// ON, lit when on, and a light
+		var lx = vertical ? cx : x + w + 9, ly = vertical ? y + h + 9 : cy;
+		if(onText !== "") // "": only the light
+		{
+			if(vertical) T( onText || "ON", cx, y + h + 10, 7, on ? INK : DIM, "center", on );
+			else T( onText || "ON", x + w - 2, y + h + 9, 7, on ? INK : DIM, "right", on );
+		}
+		ctx.fillStyle = on ? "#ff3b2a" : "#2a0d0a";
+		var ledx = vertical ? cx + w / 2 + 6 : x + w + 8, ledy = vertical ? y + 4 : y + 3;
+		ctx.beginPath(); ctx.arc( ledx, ledy, 3, 0, Math.PI * 2 ); ctx.fill();
+		if(on) { ctx.fillStyle = "rgba(255,70,50,0.3)"; ctx.beginPath(); ctx.arc( ledx, ledy, 7, 0, Math.PI * 2 ); ctx.fill(); }
+	}
+	if(r.hover && tooltip) tip( tooltip + ": " + (two ? (on ? onText : offText) : (on ? "ON" : "OFF")), cx, y + h + 26 );
+	return on;
+}
+
+// MODE: a three-way slide switch (MONO, UNI, POLY), the position lit
+function slide3( id, cx, cy, value, names, color, tooltip )
+{
+	var w = 60, h = 22, x = cx - w / 2, y = cy - h / 2, seg = w / names.length;
+	var r = hot( id, x - 4, y - 4, w + 8, h + 8 );
+	if(r.clicked)
+	{
+		var k = Math.floor( (ui.x - x) / seg );
+		value = k >= 0 && k < names.length ? k : (value + 1) % names.length;
+	}
+	ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 3 ); ctx.fill();
+	ctx.fillStyle = shade( color, -0.68 ); ctx.fillRect( x, y, w, h );
 	var g = ctx.createLinearGradient( 0, y, 0, y + h );
-	var dark = shade( color, -0.45 ), light = shade( color, r.hover ? 0.25 : 0.1 );
-	if(on) { g.addColorStop( 0, dark ); g.addColorStop( 0.5, color ); g.addColorStop( 0.52, light ); g.addColorStop( 1, color ); }
-	else { g.addColorStop( 0, color ); g.addColorStop( 0.48, light ); g.addColorStop( 0.5, color ); g.addColorStop( 1, dark ); }
-	ctx.fillStyle = g; ctx.fillRect( x, y, w, h );
-	ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect( x + 2, on ? y + h / 2 + 2 : y + 2, w - 4, 2 );
-	if(onText !== null) T( on ? (onText || "ON") : (offText || "OFF"), cx, y + h + 9, 7, on ? INK : DIM );
-	if(r.hover && tooltip) tip( tooltip + ": " + (on ? (onText || "ON") : (offText || "OFF")), cx, y + h + 26 );
+	g.addColorStop( 0, shade( color, r.hover ? 0.3 : 0.15 ) ); g.addColorStop( 1, shade( color, -0.25 ) );
+	ctx.fillStyle = g; ctx.fillRect( x + value * seg + 1, y + 1, seg - 2, h - 2 );
+	names.forEach(function(n, i){ T( n, x + seg * (i + 0.5), y + h + 9, 7, i == value ? INK : DIM, "center", i == value ); });
+	if(r.hover && tooltip) tip( tooltip( value ), cx, y + h + 26 );
+	return value;
+}
+
+// the chorus' I / II: square yellow buttons, their light above
+function ybtn( id, cx, cy, on, label, tooltip )
+{
+	var w = 36, x = cx - w / 2, y = cy - w / 2;
+	var r = hot( id, x, y, w, w );
+	if(r.clicked) on = !on;
+	ctx.fillStyle = "#050505"; ctx.fillRect( x - 3, y - 3, w + 6, w + 6 );
+	var g = ctx.createLinearGradient( 0, y, 0, y + w );
+	var c = on ? "#ffe24a" : "#5e5418";
+	g.addColorStop( 0, shade( c, r.hover ? 0.25 : 0.1 ) ); g.addColorStop( 1, shade( c, -0.2 ) );
+	ctx.fillStyle = g; ctx.fillRect( x, y + (r.held ? 1 : 0), w, w );
+	led( cx, y - 12, on, "#ff3b2a" );
+	T( label, cx, y + w + 11, 9, on ? INK : DIM );
+	if(r.hover && tooltip) tip( tooltip + ": " + (on ? "ON" : "OFF"), cx, y + w + 28 );
 	return on;
 }
 
@@ -258,19 +321,18 @@ function sbtn( id, x, y, w, h, label, lit, color, tooltip )
 }
 
 // the section names under the tilted panel, on a white line broken around them
-function sectionLine( text, x1, x2 )
+// the panel follows the original's layout: positions measured on it (its panel from x 60 to 1140,
+// y 285 to 600) and scaled to this one
+function PX( x ) { return 22 + (x - 60) * 1.411; }
+function PY( y ) { return 5 + (y - 285) * 1.47; }
+
+// a section's name at the bottom of the panel, as on the original
+function sectionName( text, cx, y, size )
 {
-	var y = 450;
-	ctx.font = "bold 11px " + FONT;
-	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "2px";
-	var tw = ctx.measureText( text ).width + 16, cx = (x1 + x2) / 2;
-	ctx.fillStyle = WHITE;
-	ctx.fillRect( x1, y, cx - tw / 2 - x1, 1.5 ); ctx.fillRect( cx + tw / 2, y, x2 - cx - tw / 2, 1.5 );
-	ctx.fillRect( x1, y - 8, 1.5, 9 ); ctx.fillRect( x2 - 1.5, y - 8, 1.5, 9 );
-	T( text, cx, y + 1, 11 );
+	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "1px";
+	T( text, cx, y || PY( 586 ), size || 15, "#c9c6be", "center", false );
 	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";
 }
-
 function heading( text, x, y ) { T( text, x, y, 9, WHITE ); }
 
 var fmtPct = function(v){ return Math.round( v * 100 ) + "%"; };
@@ -283,121 +345,159 @@ var fmtHz = function(v){ return v < 1000 ? Math.round( v ) + " Hz" : (v / 1000).
 function drawPanel()
 {
 	var w = SIZE[0];
-	// black panel, aluminium trim top and bottom
-	ctx.fillStyle = "#121212"; ctx.fillRect( 22, 0, w - 44, DECK_Y - 18 );
+	// a charcoal panel, aluminium trim on top, the wooden strip under it (the hinge of the original)
+	ctx.fillStyle = "#262626"; ctx.fillRect( 22, 0, w - 44, DECK_Y - 18 );
 	var g = ctx.createLinearGradient( 0, 0, 0, 6 );
 	g.addColorStop( 0, "#9a9a96" ); g.addColorStop( 1, "#4a4a48" );
 	ctx.fillStyle = g; ctx.fillRect( 22, 0, w - 44, 5 );
-	// the wooden strip under the panel (the hinge of the original)
 	g = ctx.createLinearGradient( 0, DECK_Y - 18, 0, DECK_Y );
 	g.addColorStop( 0, "#6a4024" ); g.addColorStop( 0.5, "#94603a" ); g.addColorStop( 1, "#4a2c18" );
 	ctx.fillStyle = g; ctx.fillRect( 22, DECK_Y - 18, w - 44, 18 );
+	// the lines between the sections
+	ctx.fillStyle = "#77746d";
+	[183, 420, 648, 1078].forEach(function(x){ ctx.fillRect( PX( x ), PY( 292 ), 1.5, PY( 596 ) - PY( 292 ) ); });
+	ctx.fillRect( PX( 850 ), PY( 292 ), 1.5, PY( 515 ) - PY( 292 ) );
+	ctx.fillRect( PX( 665 ), PY( 445 ), PX( 850 ) - PX( 665 ), 1.5 );            // FILTER / LOUDNESS CONTOUR
+	ctx.fillRect( PX( 665 ), PY( 515 ), PX( 1078 ) - PX( 665 ), 1.5 );           // over the sequencer's place
+	ctx.fillRect( PX( 665 ), PY( 445 ), 1.5, PY( 515 ) - PY( 445 ) );
+	ctx.fillRect( PX( 850 ), PY( 378 ), PX( 1078 ) - PX( 850 ), 1.5 );           // DISTORTION / CHORUS
+	ctx.fillRect( PX( 850 ), PY( 445 ), PX( 1078 ) - PX( 850 ), 1.5 );
 
 	drawControllers();
 	drawOscillators();
 	drawMixer();
 	drawModifiers();
 	drawOutput();
-	sectionLine( "CONTROLLERS", 34, 262 );
-	sectionLine( "OSCILLATOR BANK", 272, 700 );
-	sectionLine( "MIXER", 710, 958 );
-	sectionLine( "MODIFIERS", 968, 1298 );
-	sectionLine( "OUTPUT", 1308, 1536 );
+	sectionName( "CONTROLLERS", PX( 122 ) );
+	sectionName( "OSCILLATOR BANK", PX( 302 ) );
+	sectionName( "MIXER", PX( 533 ) );
+	sectionName( "MODIFIERS", PX( 863 ) );
+	sectionName( "OUTPUT", PX( 1109 ) );
 }
 
 function drawControllers()
 {
-	S.tune = mknob( "tune", 148, 82, 22, S.tune, -2, 2, "TUNE", { def: 0, bipolar: true, nums: ["-2", "", "-1", "", "0", "", "+1", "", "+2"],
+	S.tune = mknob( "tune", PX( 120 ), PY( 372 ), 21, S.tune, -2, 2, "TUNE", { def: 0, bipolar: true, nums: ["-2", "", "-1", "", "0", "", "+1", "", "+2"],
 		format: function(v){ return (v >= 0 ? "+" : "") + v.toFixed( 2 ) + " SEMITONES"; } } );
-	S.glide = mknob( "glide", 90, 200, 22, S.glide, 0.002, 5, "GLIDE", { exp: true, def: 0.12, format: fmtT } );
-	S.mod_mix = mknob( "mod_mix", 206, 200, 22, S.mod_mix, 0, 1, "MODULATION\nMIX", { def: 0.5,
-		format: function(v){ return Math.round( (1 - v) * 100 ) + "% " + (S.mod_src1 == "feg" ? "FILTER EG" : "OSC 4") + " / " + Math.round( v * 100 ) + "% " + (S.mod_src2 == "lfo" ? "LFO" : "NOISE"); } } );
-	S.osc_mod = rocker( "osc_mod", 56, 318, S.osc_mod, ORANGE, "OSCILLATOR\nMODULATION", null, null, "THE MOD WHEEL'S MODULATION TO THE OSCILLATORS' PITCH" );
-	S.mod_src1 = rocker( "mod_src1", 116, 318, S.mod_src1 == "feg", BLUE, "OSC 4 /\nFILTER EG", "FILT EG", "OSC 4", "MODULATION SOURCE (LEFT OF THE MIX)" ) ? "feg" : "osc4";
-	S.mod_src2 = rocker( "mod_src2", 176, 318, S.mod_src2 == "lfo", BLUE, "NOISE /\nLFO", "LFO", "NOISE", "MODULATION SOURCE (RIGHT OF THE MIX)" ) ? "lfo" : "noise";
-	S.auto_damp = rocker( "auto_damp", 236, 318, S.auto_damp, BLUE, "AUTO\nDAMP", null, null, "AUTO DAMP (POLY): A KEY LET GO STOPS ITS NOTE AT ONCE" );
-	var m = selector( "mode", 148, 400, 15, MODES.indexOf( S.mode ), ["MONO", "UNISON", "POLY"], null,
-		{ format: function(v){ return "MODE: " + ["MONO: THE FOUR OSCILLATORS ON THE LAST NOTE", "UNISON: THE FOUR, DETUNED AND SPREAD", "POLY: AN OSCILLATOR A NOTE (4 VOICES)"][ v ]; } } );
+	S.osc_mod = rocker( "osc_mod", PX( 184 ), PY( 380 ), S.osc_mod, BLUE, "OSCILLATOR\nMODULATION", undefined, undefined, "THE MOD WHEEL'S MODULATION TO THE OSCILLATORS' PITCH" );
+	var m = slide3( "mode", PX( 92 ), PY( 429 ), MODES.indexOf( S.mode ), ["MONO", "UNI", "POLY"], GREEN,
+		function(v){ return "MODE: " + ["MONO: THE FOUR OSCILLATORS ON THE LAST NOTE", "UNISON: THE FOUR, DETUNED AND SPREAD", "POLY: AN OSCILLATOR A NOTE (4 VOICES)"][ v ]; } );
+	T( "MODE", PX( 92 ), PY( 429 ) - 20, 8 );
 	if(MODES[m] != S.mode) { S.mode = MODES[m]; send({ type: "allNotesOff" }); }
-	T( "MODE", 84, 400, 9 );
+	S.auto_damp = rocker( "auto_damp", PX( 152 ), PY( 429 ), S.auto_damp, GREEN, "AUTO DAMP", undefined, undefined, "AUTO DAMP (POLY): A KEY LET GO STOPS ITS NOTE AT ONCE" );
+	S.glide = mknob( "glide", PX( 92 ), PY( 488 ), 18, S.glide, 0.002, 5, "GLIDE", { exp: true, def: 0.12, format: fmtT } );
+	S.mod_mix = mknob( "mod_mix", PX( 152 ), PY( 488 ), 18, S.mod_mix, 0, 1, "MODULATION MIX", { def: 0.5,
+		format: function(v){ return Math.round( (1 - v) * 100 ) + "% " + (S.mod_src1 == "feg" ? "FILTER EG" : "OSC 4") + " / " + Math.round( v * 100 ) + "% " + (S.mod_src2 == "lfo" ? "LFO" : "NOISE"); } } );
+	S.mod_src1 = rocker( "mod_src1", PX( 92 ), PY( 549 ), S.mod_src1 == "feg", "#3a3a3a", null, "FILT EG", "OSC 4", "MODULATION SOURCE (LEFT OF THE MIX)" ) ? "feg" : "osc4";
+	S.mod_src2 = rocker( "mod_src2", PX( 152 ), PY( 549 ), S.mod_src2 == "lfo", "#3a3a3a", null, "LFO", "NOISE", "MODULATION SOURCE (RIGHT OF THE MIX)" ) ? "lfo" : "noise";
 }
 
 function drawOscillators()
 {
-	var rows = [92, 177, 262, 347], RX = 360, FX = 488, WX = 612;
-	T( "RANGE", RX, 38, 9 ); T( "FREQUENCY", FX, 38, 9 ); T( "WAVEFORM", WX, 38, 9 );
+	var rows = [342, 411, 479, 547].map( PY ), RX = PX( 245 ), FX = PX( 315 ), WX = PX( 385 );
+	T( "RANGE", RX, PY( 312 ), 9 ); T( "WAVEFORM", WX, PY( 312 ), 9 );
 	var glyphs = ["tri", "trisaw", "saw", "sq", "wide", "narrow"], g4 = ["tri", "rsaw", "saw", "sq", "wide", "narrow"];
 	var gnames = ["TRIANGLE", "TRI / SAW", "SAW", "SQUARE", "WIDE PULSE", "NARROW PULSE"], g4names = ["TRIANGLE", "REVERSE SAW", "SAW", "SQUARE", "WIDE PULSE", "NARROW PULSE"];
 	S.osc.forEach(function(o, i){
 		var cy = rows[i], n = i + 1;
-		T( "OSC", 292, cy - 6, 8, DIM ); T( String( n ), 292, cy + 7, 14 );
-		o.range = selector( "osc" + n + "_range", RX, cy, 20, o.range, RANGES, null, { format: function(v){ return "OSC " + n + " RANGE " + RANGES[v]; } } );
+		o.range = selector( "osc" + n + "_range", RX, cy, 19, o.range, RANGES, null, { format: function(v){ return "OSC " + n + " RANGE " + RANGES[v]; } } );
+		var gates = ST.gates || [], sounding = S.mode == "poly" ? gates[i] >= 0 : gates.some(function(g){ return g >= 0; });
+		led( RX + 40, cy - 34, o.on && sounding, "#ff3b2a" ); // its light: the oscillator sounding
 		if(i)
-			o.fine = mknob( "osc" + n + "_fine", FX, cy, 22, o.fine, -7, 7, null, { def: 0, bipolar: true, nums: ["-7", "", "", "", "", "", "", "0", "", "", "", "", "", "", "+7"],
-				format: function(v){ return "OSC " + n + " " + (v >= 0 ? "+" : "") + v.toFixed( 2 ) + " SEMITONES"; } } );
-		else
 		{
-			T( "OSCILLATOR - 1", FX, cy - 6, 9, DIM ); T( "FOLLOWS TUNE", FX, cy + 8, 8, DIM, "center", false );
+			T( "OSCILLATOR-" + n, FX, cy - 34, 9 );
+			o.fine = mknob( "osc" + n + "_fine", FX, cy, 21, o.fine, -7, 7, null, { def: 0, bipolar: true, nums: ["-7", "", "", "", "", "", "", "0", "", "", "", "", "", "", "+7"],
+				format: function(v){ return "OSC " + n + " " + (v >= 0 ? "+" : "") + v.toFixed( 2 ) + " SEMITONES"; } } );
 		}
-		o.wave = selector( "osc" + n + "_wave", WX, cy, 20, o.wave, i == 3 ? g4 : glyphs, null, { glyphs: true, glyphNames: i == 3 ? g4names : gnames,
+		else { T( "OSCILLATOR-1", FX, cy - 26, 9 ); T( "FREQUENCY", FX, cy - 14, 9 ); T( "(FOLLOWS TUNE)", FX, cy + 4, 8, DIM, "center", false ); }
+		o.wave = selector( "osc" + n + "_wave", WX, cy, 19, o.wave, i == 3 ? g4 : glyphs, null, { glyphs: true, glyphNames: i == 3 ? g4names : gnames,
 			format: function(v){ return "OSC " + n + " " + (i == 3 ? g4names : gnames)[v]; } } );
 	});
-	S.osc4_ctrl = rocker( "osc4_ctrl", 676, 347, S.osc4_ctrl, ORANGE, "OSC 4\nCONTROL", null, null, "OSC 4 FOLLOWS THE KEYBOARD (OFF: A DRONE / MODULATION OSCILLATOR)" );
+	S.osc4_ctrl = rocker( "osc4_ctrl", PX( 197 ), PY( 547 ), S.osc4_ctrl, BLUE, "OSC 4\nCONTROL", undefined, undefined, "OSC 4 FOLLOWS THE KEYBOARD (OFF: A DRONE / MODULATION OSCILLATOR)", true );
 }
 
 function drawMixer()
 {
-	var names = ["OSC 1", "OSC 2", "OSC 3", "OSC 4", "EXT IN", "NOISE"];
-	for(var i = 0; i < 6; ++i)
+	// the name plate, where the original has its logo
+	ctx.font = "bold 26px " + FONT; ctx.fillStyle = INK; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+	ctx.fillText( "PARA", PX( 532 ), PY( 309 ) );
+	ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect( PX( 540 ), PY( 296 ), 34, 32, 6 ); ctx.stroke();
+	T( "D", PX( 540 ) + 17, PY( 296 ) + 17, 22 );
+	var vy = [345, 412, 480, 547].map( PY ), VX = PX( 450 ), SX = PX( 505 );
+	for(var i = 0; i < 4; ++i)
 	{
-		var cy = 70 + i * 63, src = i < 4 ? S.osc[i] : (i == 4 ? S.ext : S.noise), id = i < 4 ? "osc" + (i + 1) : (i == 4 ? "ext" : "noise");
-		T( names[i] + " VOLUME", 790, cy - 28, 8 );
-		src.vol = mknob( id + "_vol", 790, cy, 16, src.vol, 0, 1, null, { def: i < 4 ? 0.75 : 0.5, numSize: 7, format: fmtPct } );
-		src.on = rocker( id + "_on", 856, cy + 2, src.on, BLUE, null, null, null, names[i] );
+		var o = S.osc[i], n = i + 1;
+		T( "VOLUME", VX, vy[i] - 35, 8 );
+		o.vol = mknob( "osc" + n + "_vol", VX, vy[i], 17, o.vol, 0, 1, null, { def: 0.75, numSize: 7, format: function(v){ return "VOLUME " + fmtPct( v ); } } );
 	}
-	S.noise.pink = rocker( "noise_pink", 912, 70 + 5 * 63 + 2, S.noise.pink, WHITE, "NOISE", "PINK", "WHITE", "NOISE COLOUR" );
-	T( "OVERLOAD", 912, 70 + 4 * 63 - 12, 7 );
-	led( 912, 70 + 4 * 63 + 2, ST.overload );
+	// the ON switches, in the original's order: OSC 1, EXT IN, OSC 2 / OSC 3, NOISE, OSC 4
+	var on = [[345, "osc1_on", S.osc[0], "OSC 1"], [378, "ext_on", S.ext, "EXT IN"], [412, "osc2_on", S.osc[1], "OSC 2"],
+		[480, "osc3_on", S.osc[2], "OSC 3"], [514, "noise_on", S.noise, "NOISE"], [548, "osc4_on", S.osc[3], "OSC 4"]];
+	on.forEach(function(q){
+		var y = PY( q[0] );
+		ctx.fillStyle = "#77746d";
+		if(q[2] == S.ext || q[2] == S.noise) ctx.fillRect( SX + 30, y, PX( 545 ) - SX - 30, 1.2 ); // the line to its volume knob
+		q[2].on = rocker( q[1], SX, y, q[2].on, ORANGE, null, undefined, undefined, q[3] );
+	});
+	T( "EXT IN", PX( 560 ), PY( 340 ), 8 ); T( "VOLUME", PX( 560 ), PY( 350 ), 8 );
+	S.ext.vol = mknob( "ext_vol", PX( 560 ), PY( 377 ), 17, S.ext.vol, 0, 1, null, { def: 0.5, numSize: 7, format: function(v){ return "EXT IN VOLUME " + fmtPct( v ); } } );
+	T( "OVERLOAD", PX( 602 ), PY( 366 ), 7 ); led( PX( 602 ), PY( 378 ), ST.overload, "#ff3b2a" );
+	T( "NOISE", PX( 560 ), PY( 476 ), 8 ); T( "VOLUME", PX( 560 ), PY( 486 ), 8 );
+	S.noise.vol = mknob( "noise_vol", PX( 560 ), PY( 513 ), 17, S.noise.vol, 0, 1, null, { def: 0.5, numSize: 7, format: function(v){ return "NOISE VOLUME " + fmtPct( v ); } } );
+	S.noise.pink = rocker( "noise_pink", PX( 603 ), PY( 516 ), S.noise.pink, ORANGE, null, "PINK", "WHITE", "NOISE COLOUR", true );
 }
 
 function drawModifiers()
 {
-	S.filter_mod = rocker( "filter_mod", 996, 84, S.filter_mod, ORANGE, "FILTER\nMODULATION", null, null, "THE MOD WHEEL'S MODULATION TO THE CUTOFF" );
-	var k1 = rocker( "kbd1", 996, 166, S.kbd & 1, ORANGE, "KEYBOARD\nCONTROL 1", null, null, "KEYBOARD CONTROL 1 (1/3)" );
-	var k2 = rocker( "kbd2", 996, 248, (S.kbd & 2) >> 1, ORANGE, "KEYBOARD\nCONTROL 2", null, null, "KEYBOARD CONTROL 2 (2/3)" );
+	// the switches' column
+	var CX = PX( 645 );
+	S.hp = rocker( "hp", CX, PY( 345 ), S.hp, BLUE, "FILTER MODE", "HI", "LO", "FILTER MODE" );
+	S.filter_mod = rocker( "filter_mod", CX, PY( 380 ), S.filter_mod, BLUE, "FILTER MODULATION", "", undefined, "THE MOD WHEEL'S MODULATION TO THE CUTOFF" );
+	var k1 = rocker( "kbd1", CX, PY( 413 ), S.kbd & 1, BLUE, null, "", undefined, "KEYBOARD CONTROL 1 (1/3)" );
+	T( "KEYBOARD", CX, PY( 431 ) - 4, 8 ); T( "CONTROL", CX, PY( 431 ) + 6, 8 );
+	T( "1", CX - 32, PY( 413 ), 8 ); T( "2", CX - 32, PY( 449 ), 8 );
+	var k2 = rocker( "kbd2", CX, PY( 449 ), (S.kbd & 2) >> 1, BLUE, null, "", undefined, "KEYBOARD CONTROL 2 (2/3)" );
 	S.kbd = (k1 ? 1 : 0) + (k2 ? 2 : 0);
-	S.hp = rocker( "hp", 996, 330, S.hp, WHITE, "FILTER\nMODE", "HIGH", "LOW", "FILTER MODE" );
-	S.decay_sw = rocker( "decay_sw", 996, 404, S.decay_sw, BLUE, "DECAY", null, null, "DECAY: THE CONTOURS RELEASE WITH THEIR DECAY TIME (OFF: AT ONCE)" );
-	heading( "FILTER", 1180, 22 );
-	S.cutoff = mknob( "cutoff", 1090, 98, 26, S.cutoff, 20, 20000, "CUTOFF\nFREQUENCY", { exp: true, def: 1800, nums: ["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"], format: fmtHz } );
-	S.emphasis = mknob( "emphasis", 1185, 98, 20, S.emphasis, 0, 1, "EMPHASIS", { def: 0.25, format: fmtPct } );
-	S.contour = mknob( "contour", 1265, 98, 20, S.contour, 0, 1, "AMOUNT\nOF CONTOUR", { def: 0.45, format: fmtPct } );
-	S.f_attack = mknob( "f_attack", 1090, 222, 20, S.f_attack, 0.001, 10, "ATTACK TIME", { exp: true, def: 0.01, format: fmtT } );
-	S.f_decay = mknob( "f_decay", 1185, 222, 20, S.f_decay, 0.004, 20, "DECAY TIME", { exp: true, def: 0.6, format: fmtT } );
-	S.f_sustain = mknob( "f_sustain", 1265, 222, 20, S.f_sustain, 0, 1, "SUSTAIN LEVEL", { def: 0.35, format: fmtPct } );
-	heading( "LOUDNESS CONTOUR", 1180, 282 );
-	S.l_attack = mknob( "l_attack", 1090, 352, 20, S.l_attack, 0.001, 10, "ATTACK TIME", { exp: true, def: 0.005, format: fmtT } );
-	S.l_decay = mknob( "l_decay", 1185, 352, 20, S.l_decay, 0.004, 20, "DECAY TIME", { exp: true, def: 0.8, format: fmtT } );
-	S.l_sustain = mknob( "l_sustain", 1265, 352, 20, S.l_sustain, 0, 1, "SUSTAIN LEVEL", { def: 0.85, format: fmtPct } );
+	S.decay_sw = rocker( "decay_sw", CX, PY( 482 ), S.decay_sw, WHITE, "DECAY", undefined, undefined, "DECAY: THE CONTOURS RELEASE WITH THEIR DECAY TIME (OFF: AT ONCE)" );
+	// FILTER and LOUDNESS CONTOUR
+	var x1 = PX( 700 ), x2 = PX( 760 ), x3 = PX( 820 );
+	S.cutoff = mknob( "cutoff", x1, PY( 345 ), 21, S.cutoff, 20, 20000, "CUTOFF\nFREQUENCY", { exp: true, def: 1800, nums: ["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"], format: fmtHz } );
+	S.emphasis = mknob( "emphasis", x2, PY( 345 ), 21, S.emphasis, 0, 1, "EMPHASIS", { def: 0.25, format: fmtPct } );
+	S.contour = mknob( "contour", x3, PY( 345 ), 21, S.contour, 0, 1, "AMOUNT\nOF CONTOUR", { def: 0.45, format: fmtPct } );
+	S.f_attack = mknob( "f_attack", x1, PY( 412 ), 19, S.f_attack, 0.001, 10, "ATTACK", { exp: true, def: 0.01, format: fmtT } );
+	S.f_decay = mknob( "f_decay", x2, PY( 412 ), 19, S.f_decay, 0.004, 20, "DECAY", { exp: true, def: 0.6, format: fmtT } );
+	S.f_sustain = mknob( "f_sustain", x3, PY( 412 ), 19, S.f_sustain, 0, 1, "SUSTAIN", { def: 0.35, format: fmtPct } );
+	sectionName( "FILTER", x2, PY( 441 ), 12 );
+	S.l_attack = mknob( "l_attack", x1, PY( 480 ), 19, S.l_attack, 0.001, 10, "ATTACK", { exp: true, def: 0.005, format: fmtT } );
+	S.l_decay = mknob( "l_decay", x2, PY( 480 ), 19, S.l_decay, 0.004, 20, "DECAY", { exp: true, def: 0.8, format: fmtT } );
+	S.l_sustain = mknob( "l_sustain", x3, PY( 480 ), 19, S.l_sustain, 0, 1, "SUSTAIN", { def: 0.85, format: fmtPct } );
+	sectionName( "LOUDNESS CONTOUR", x2, PY( 509 ), 12 );
 	// the contours' lights
-	led( 1046, 192, ST.feg > 0.05, "#ff3b2a" );
-	led( 1046, 318, ST.leg > 0.05, "#ff3b2a" );
+	led( PX( 845 ), PY( 300 ), ST.feg > 0.05, "#ff3b2a" );
+	led( PX( 845 ), PY( 452 ), ST.leg > 0.05, "#ff3b2a" );
 }
 
 function drawOutput()
 {
-	S.volume = mknob( "volume", 1422, 98, 26, S.volume, 0, 1, "VOLUME", { def: 0.7, format: fmtPct } );
-	heading( "CHORUS", 1422, 168 );
-	var c = S.chorus;
-	c.on = rocker( "chorus_on", 1356, 222, c.on, BLUE, "ON / OFF", null, null, "CHORUS" );
-	c.i = rocker( "chorus_i", 1422, 222, c.i, WHITE, "I", null, null, "CHORUS I" );
-	c.ii = rocker( "chorus_ii", 1488, 222, c.ii, WHITE, "II", null, null, "CHORUS II" );
-	heading( "DISTORTION", 1422, 278 );
+	// DISTORTION
 	var d = S.dist;
-	d.amount = mknob( "dist_amount", 1356, 340, 16, d.amount, 0, 1, "DISTORTION", { def: 0.4, numSize: 7, format: fmtPct } );
-	d.tone = mknob( "dist_tone", 1422, 340, 16, d.tone, 0, 1, "TONE", { def: 0.5, numSize: 7, format: fmtPct } );
-	d.level = mknob( "dist_level", 1488, 340, 16, d.level, 0, 1, "LEVEL", { def: 0.7, numSize: 7, format: fmtPct } );
-	d.on = rocker( "dist_on", 1422, 408, d.on, BLUE, null, null, null, "DISTORTION" );
+	d.amount = mknob( "dist_amount", PX( 880 ), PY( 345 ), 19, d.amount, 0, 1, "DIST", { def: 0.4, numSize: 7, format: fmtPct } );
+	d.tone = mknob( "dist_tone", PX( 940 ), PY( 345 ), 19, d.tone, 0, 1, "TONE", { def: 0.5, numSize: 7, format: fmtPct } );
+	d.level = mknob( "dist_level", PX( 1000 ), PY( 345 ), 19, d.level, 0, 1, "LEVEL", { def: 0.7, numSize: 7, format: fmtPct } );
+	d.on = rocker( "dist_on", PX( 1050 ), PY( 345 ), d.on, ORANGE, null, undefined, undefined, "DISTORTION" );
+	sectionName( "DISTORTION", PX( 940 ), PY( 372 ), 12 );
+	// CHORUS: I, II, ON
+	var c = S.chorus;
+	c.i = ybtn( "chorus_i", PX( 910 ), PY( 412 ), c.i, "I", "CHORUS I" );
+	c.ii = ybtn( "chorus_ii", PX( 970 ), PY( 412 ), c.ii, "II", "CHORUS II" );
+	c.on = rocker( "chorus_on", PX( 1050 ), PY( 412 ), c.on, ORANGE, null, undefined, undefined, "CHORUS" );
+	sectionName( "CHORUS", PX( 940 ), PY( 440 ), 12 );
+	// where the original has its sequencer: what this one is
+	T( "4-VOICE PARAPHONIC", PX( 964 ), PY( 470 ), 10, DIM, "center", false );
+	T( "ANALOG SYNTHESIZER", PX( 964 ), PY( 484 ), 10, DIM, "center", false );
+	T( "SEQUENCER ON THE KEYBOARD DECK", PX( 964 ), PY( 500 ), 8, "#5f5d58", "center", false );
+	// OUTPUT
+	S.volume = mknob( "volume", PX( 1107 ), PY( 345 ), 21, S.volume, 0, 1, "VOLUME", { def: 0.7, format: fmtPct } );
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +510,7 @@ function drawDeck()
 	g.addColorStop( 0, "#1b1b1a" ); g.addColorStop( 1, "#111110" );
 	ctx.fillStyle = g; ctx.fillRect( 22, DECK_Y, w - 44, h - DECK_Y );
 	drawWheels();
-	S.glide_on = rocker( "glide_on", 196, 574, S.glide_on, BLUE, "GLIDE", null, null, "GLIDE ON / OFF" );
+	S.glide_on = rocker( "glide_on", 196, 574, S.glide_on, WHITE, "GLIDE", undefined, undefined, "GLIDE ON / OFF" );
 	S.lfo_rate = mknob( "lfo_rate", 262, 590, 17, S.lfo_rate, 0.05, 200, "LFO RATE", { exp: true, def: 5, numSize: 7,
 		format: function(v){ return v < 10 ? v.toFixed( 2 ) + " Hz" : Math.round( v ) + " Hz"; } } );
 	led( 300, 548, ST.lfo > 0.3, "#ff3b2a" );
@@ -488,7 +588,7 @@ function drawSequencer()
 	var cur = pat.steps[ Math.max( 0, (q.cursor + pat.len - 1) % pat.len ) ];
 	var rt = mknob( "ratchet", 602, 646, 12, cur.ratchet, 1, 4, "RATCHET", { step: 1, def: 1, noScale: true, format: function(v){ return "THE LAST STEP RECORDED PLAYS " + v + "×"; } } );
 	if(edit) cur.ratchet = rt;
-	q.sync = rocker( "sync", 646, 640, q.sync, BLUE, "SYNC", null, null, "SYNC: FOLLOW THE RACK'S TEMPO (ITS FIRST DEVICE WITH A CLOCK)" );
+	q.sync = rocker( "sync", 646, 640, q.sync, BLUE, "SYNC", undefined, undefined, "SYNC: FOLLOW THE RACK'S TEMPO (ITS FIRST DEVICE WITH A CLOCK)" );
 
 	// LOCATION: the page shown; the playing page blinks
 	T( "LOCATION", 712, 594, 7, DIM );
