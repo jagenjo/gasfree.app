@@ -6,8 +6,9 @@
 // ENV, RUN or LOOP), an LFO (six shapes, free or synced) and a modulation MATRIX: five sources (CYC ENV,
 // ENVELOPE, LFO, PRESSURE, KEY/ARP) by seven destinations (PITCH, WAVE, TIMBRE, CUTOFF and three
 // ASSIGN columns, each set to a knob). An arpeggiator (UP, ORDER, RAND, PATTERN) and a sequencer of up
-// to 64 steps (4 notes a step, recorded from the keys), with SPICE / DICE (random octaves, gates, rests
-// per step), at its own RATE, the rack's tempo (SYNC) or CLOCK IN. Glide.
+// to 64 steps (4 notes a step, recorded from the keys; two patterns, A and B), with SPICE / DICE (random
+// octaves, gates, rests per step), at its own RATE, the rack's tempo (SYNC) or CLOCK IN. Glide. AMP MOD
+// off: the VCA is a gate. The cycling envelope's rise and fall have a curve (SHIFT on the panel).
 // It gets the raw notes of its MIDI channel (POLY), and the notes of its own keyboard (with pressure).
 // Loaded on the main thread too, for the tables (WR_DSP.minimad.TABLES).
 (function(){
@@ -147,7 +148,7 @@ class MiniMadDSP {
 	newVoice() {
 		return { note: 60, gate: false, vel: 1, press: 0, env: 0, stage: 0, age: 0, pitch: 0, target: 0, held: false, fresh: true,
 			ph: new Float64Array(8), sub: 0, z: new Float64Array(16), c: new Float64Array(40), /* c: the engine's values, made at the control rate (prep) */ ks: new Float32Array(4096), ksPos: 0, ksLp: 0, excite: 0,
-			w: 0, t: 0, sh: 0, freq: 261.6 };
+			w: 0, t: 0, sh: 0, freq: 261.6, gv: 0 };
 	}
 
 	rollDice() {
@@ -174,7 +175,7 @@ class MiniMadDSP {
 			case "note": this.press = m.press || 0; m.on ? this.keyOn(m.note, m.vel === undefined ? 1 : m.vel) : this.keyOff(m.note); break; // press: from its own keyboard (MIDI has none: 0)
 			case "press": this.press = clamp(m.value, 0, 1); for (const v of this.voices) if (v.note === m.note && v.gate) v.press = this.press; break; // the arp and the sequence take it too
 			case "allNotesOff": this.allOff(); break;
-			case "bend": this.bend = m.value; break;
+			case "bend": this.bend = m.value; break;            // octaves (MIDI, or the touch strip)
 			case "play": this.setPlay(m.value === undefined ? !this.playing : !!m.value); break;
 			case "dice": this.rollDice(); break;
 			case "trigger": if (m.gate) this.keyOn(60, 1); else this.keyOff(60); break;
@@ -279,10 +280,13 @@ class MiniMadDSP {
 		const s = this.s, base = 60 * this.sr / (Math.max(20, this.tempo() || 120) * 4), sw = clamp(s.swing, 0, 1) * 0.5;
 		return Math.max(1, Math.round(base * (idx % 2 ? 1 - sw : 1 + sw)));
 	}
+	// the notes held (or latched), over 1 to 4 octaves (OCT)
 	arpNotes() {
 		const s = this.s;
 		const src = s.hold ? this.latched.slice() : this.keys.map((k) => k.note);
-		return src;
+		const oct = clamp(s.arp_oct | 0, 1, 4), out = [];
+		for (let o = 0; o < oct; o++) for (const n of src) out.push(n + o * 12);
+		return out;
 	}
 	advance() {
 		const s = this.s;
@@ -293,11 +297,11 @@ class MiniMadDSP {
 		const len = this.stepLen(this.stepIdx);
 		let notes = [];
 		if (s.seq_on && this.playing) {
-			const n = s.seq_len | 0;
+			const b = s.pattern === 1, seq = (b ? s.seq_b : s.seq) || [], n = (b ? s.seq_b_len : s.seq_len) | 0; // pattern A or B
 			if (n <= 0) return;
-			const st = s.seq[this.stepIdx % n] || [];
+			const st = seq[this.stepIdx % n] || [];
 			let tr = 0;
-			if (this.keys.length) { const first = s.seq.find((x) => x && x.length); if (first) tr = this.keys[this.keys.length - 1].note - first[0]; } // the keys transpose it from its first note
+			if (this.keys.length) { const first = seq.find((x) => x && x.length); if (first) tr = this.keys[this.keys.length - 1].note - first[0]; } // the keys transpose it from its first note
 			notes = st.map((x) => x + tr);
 			this.seqStep = this.stepIdx % n;
 		}
@@ -367,7 +371,10 @@ class MiniMadDSP {
 			else { this.ctime += dt; if (this.ctime >= hold * hold * 4) this.cstage = 3; } // RUN, LOOP: HOLD is a time at the top (0 .. 4 s)
 		}
 		else if (this.cstage === 3) { this.cyc -= dt / fall; if (this.cyc <= 0) { this.cyc = 0; this.cstage = mode === 2 ? 1 : 0; } }
-		const cycOut = this.cyc * clamp(s.cyc_amt + this.asg("cyc_amt"), 0, 1);
+		// its curves: RISE SHAPE / FALL SHAPE (-1 fast start .. 0 straight .. 1 slow start)
+		const crv = this.cstage === 1 ? s.rise_shape || 0 : (this.cstage === 3 ? s.fall_shape || 0 : 0);
+		const cv = crv ? Math.pow(this.cyc, Math.pow(4, crv)) : this.cyc;
+		const cycOut = cv * clamp(s.cyc_amt + this.asg("cyc_amt"), 0, 1);
 		this.cycOut = cycOut;
 		// envelopes: rates
 		const A = MAP.envTime(clamp(s.attack + this.asg("attack"), 0, 1)), D = MAP.envTime(clamp(s.decay + this.asg("decay"), 0, 1)) * 0.8;
@@ -650,7 +657,9 @@ class MiniMadDSP {
 			else if (v.stage === 2) v.env += (this.envS - v.env) * this.envD;
 			else { v.env -= v.env * this.envD; if (v.env < 1e-4) { v.env = 0; v.stage = 0; continue; } }
 			if (v.gate) anyGate = true;
-			const amp = v.env * (0.6 + 0.4 * v.vel);
+			// AMP MOD off: the VCA is a gate (a few ms in and out), the envelope only on the filter
+			if (s.amp_mod === false) { v.gv += ((v.gate ? 1 : 0) - v.gv) * 0.004; if (!v.gate && v.gv < 1e-3 && v.stage === 3) { v.stage = 0; v.env = 0; continue; } }
+			const amp = (s.amp_mod === false ? v.gv : v.env) * (0.6 + 0.4 * v.vel);
 			sum += this.osc(v, type) * amp * GAIN[type];
 		}
 		// the filter (a little drive into it)
