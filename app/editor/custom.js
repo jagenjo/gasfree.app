@@ -31,6 +31,19 @@ function paint( name, col ) { return name == "dim" ? col.dim : (name == "line" ?
 
 var M = null, S = null, ST = null;
 var held = {};    // module id -> { item id: held } (momentary buttons)
+var shown = {};   // module id + item id -> { v, t }: what an LED bar or a meter shows, moving at its own speed
+
+// a value shown with ballistics: an LED bar rises at once and falls slowly; a needle has weight
+function ballistic( it, target, rise, fall )
+{
+	if(ST.still) return target;
+	var key = M.id + "|" + it.id, now = performance.now(), b = shown[ key ];
+	if(!b) b = shown[ key ] = { v: target, t: now };
+	var dt = Math.min( 0.1, Math.max( 0, (now - b.t) / 1000 ) );
+	b.t = now;
+	b.v += (target - b.v) * (1 - Math.exp( -dt / (target > b.v ? rise : fall) ));
+	return b.v;
+}
 
 function defaultBack( name )
 {
@@ -117,6 +130,9 @@ function box( it )
 		case "slider": return { x: it.x - 22, y: it.y - 30, w: 44, h: (it.h || 120) + 48 };
 		case "button": case "toggle": var w = it.w || 70, h = it.h || 26; return { x: it.x - w / 2, y: it.y - h / 2, w: w, h: h };
 		case "led": return { x: it.x - 9, y: it.y - 9, w: 18, h: 18 };
+		case "ledbar": case "meter":
+			var bw = it.w || 120, bh = it.h || 20, lh = it.kind == "ledbar" && it.label ? 16 : 0;
+			return { x: it.x - bw / 2, y: it.y - bh / 2 - lh, w: bw, h: bh + lh };
 		case "jackin": case "jackout": return { x: it.x - 20, y: it.y - 34, w: 40, h: 54 };
 		case "ain": case "aout": case "mainl": case "mainr": return { x: it.x - 22, y: it.y - 36, w: 44, h: 56 };
 		case "midiin": return { x: it.x - 26, y: it.y - 36, w: 52, h: 96 };
@@ -210,6 +226,78 @@ function drawItem( it, col )
 			ctx.globalAlpha = 1;
 			if(it.label) drawLabel( it.label, it.x, it.y - 16, 10, false, col.ink );
 			break;
+		case "ledbar":
+			// a row of LEDs: as many lit as the input's level (linear, or in dB from -48 to 0)
+			var bw = it.w || 120, bh = it.h || 20, vert = it.dir == "v", cnt = Math.max( 2, Math.min( 48, it.count || 10 ) );
+			var lvl = ST && ST.leds ? ST.leds[ it.id ] || 0 : 0;
+			if(it.scale == "db") lvl = lvl > 0 ? Math.max( 0, 1 + 20 * Math.log10( lvl ) / 48 ) : 0;
+			lvl = ballistic( it, Math.min( 1, lvl ), 0.01, 0.25 );
+			var bx = it.x - bw / 2, by = it.y - bh / 2, pad = 3, len = (vert ? bh : bw) - pad * 2, cell = len / cnt, gap = Math.min( 3, cell * 0.25 );
+			ctx.fillStyle = "#0a0a0a"; ctx.beginPath(); ctx.roundRect( bx, by, bw, bh, 3 ); ctx.fill();
+			for(var i = 0; i < cnt; ++i)
+			{
+				var f = (i + 0.5) / cnt, lit = lvl * cnt > i + 0.15;
+				var lc = it.color && it.color != "meter" ? LED_COLORS[ it.color ] || LED_COLORS.red : (f > 0.85 ? LED_COLORS.red : (f > 0.65 ? LED_COLORS.amber : LED_COLORS.green));
+				var cx = vert ? bx + pad : bx + pad + i * cell + gap / 2, cy = vert ? by + bh - pad - (i + 1) * cell + gap / 2 : by + pad;
+				var cw = vert ? bw - pad * 2 : cell - gap, ch = vert ? cell - gap : bh - pad * 2;
+				ctx.fillStyle = lc; ctx.globalAlpha = lit ? 1 : 0.16;
+				ctx.fillRect( cx, cy, cw, ch );
+				if(lit) { ctx.globalAlpha = 0.3; ctx.fillRect( cx - 1.5, cy - 1.5, cw + 3, ch + 3 ); }
+			}
+			ctx.globalAlpha = 1;
+			if(it.label) drawLabel( it.label, it.x, by - 9, 10, false, col.ink );
+			break;
+		case "meter":
+			// an analog panel meter: a needle over a printed scale, 0..1 or centre zero (-1..1)
+			var mw = it.w || 140, mh = it.h || 100, mx = it.x - mw / 2, my = it.y - mh / 2, bip = it.scale == "bi";
+			var mv = ST && ST.meters && ST.meters[ it.id ] ? ST.meters[ it.id ] : [0, 0];
+			var mn = ballistic( it, bip ? (mv[1] + 1) / 2 : Math.min( 1, mv[0] ), 0.12, 0.12 );
+			var dark = it.face == "black", ink = dark ? "#eae4d4" : "#1e1a14";
+			ctx.fillStyle = "#0c0c0c"; ctx.beginPath(); ctx.roundRect( mx, my, mw, mh, 5 ); ctx.fill();
+			var fx = mx + 5, fy = my + 5, fw = mw - 10, fh = mh - 10;
+			var fg = ctx.createLinearGradient( 0, fy, 0, fy + fh );
+			fg.addColorStop( 0, dark ? "#2a2a28" : "#f4ecd6" ); fg.addColorStop( 1, dark ? "#141413" : "#ddd0ae" );
+			ctx.fillStyle = fg; ctx.beginPath(); ctx.roundRect( fx, fy, fw, fh, 3 ); ctx.fill();
+			ctx.save(); ctx.beginPath(); ctx.rect( fx, fy, fw, fh ); ctx.clip();
+			// the pivot below the face's bottom edge; the scale is an arc of 100 degrees
+			var pr = Math.min( fh * 0.95, fw * 0.5 ), px = fx + fw / 2, py = fy + fh * 0.22 + pr, A = 50 * Math.PI / 180, cover = Math.max( 12, fh * 0.24 );
+			var ang = function(n){ return -Math.PI / 2 - A + 2 * A * n; };
+			ctx.lineWidth = 1.2; ctx.strokeStyle = ink;
+			ctx.beginPath(); ctx.arc( px, py, pr * 0.82, ang( 0 ), ang( 1 ) ); ctx.stroke();
+			// the red zone: the top of the scale (or both ends, centre zero)
+			ctx.strokeStyle = "#c8322a"; ctx.lineWidth = 4;
+			ctx.beginPath(); ctx.arc( px, py, pr * 0.82 + 3, ang( 0.8 ), ang( 1 ) ); ctx.stroke();
+			if(bip) { ctx.beginPath(); ctx.arc( px, py, pr * 0.82 + 3, ang( 0 ), ang( 0.2 ) ); ctx.stroke(); }
+			ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+			ctx.font = "bold " + Math.max( 7, Math.round( pr * 0.11 ) ) + "px " + FONT;
+			for(var t = 0; t <= 20; ++t)
+			{
+				var a = ang( t / 20 ), big = t % 5 == 0, r0 = pr * 0.82, r1 = r0 + (big ? 7 : 4);
+				ctx.lineWidth = big ? 1.4 : 0.8;
+				ctx.beginPath(); ctx.moveTo( px + Math.cos( a ) * r0, py + Math.sin( a ) * r0 ); ctx.lineTo( px + Math.cos( a ) * r1, py + Math.sin( a ) * r1 ); ctx.stroke();
+				if(t % 10 == 0)
+				{
+					var txt = bip ? ["-", "0", "+"][ t / 10 ] : String( t / 2 );
+					ctx.fillText( txt, px + Math.cos( a ) * (r1 + 8), py + Math.sin( a ) * (r1 + 8) );
+				}
+			}
+			// the needle, its pivot under the cover at the bottom, which carries the label
+			var na = ang( Math.max( -0.03, Math.min( 1.03, mn ) ) );
+			ctx.strokeStyle = dark ? "#ff6a3a" : "#151515"; ctx.lineWidth = 1.5;
+			ctx.beginPath(); ctx.moveTo( px + Math.cos( na ) * pr * 0.25, py + Math.sin( na ) * pr * 0.25 ); ctx.lineTo( px + Math.cos( na ) * pr * 0.95, py + Math.sin( na ) * pr * 0.95 ); ctx.stroke();
+			ctx.fillStyle = dark ? "#0e0e0d" : "#24221e"; ctx.fillRect( fx, fy + fh - cover, fw, cover );
+			if(it.label)
+			{
+				ctx.fillStyle = "#e8e0c8"; ctx.font = "bold " + Math.max( 8, Math.round( cover * 0.55 ) ) + "px " + FONT;
+				ctx.fillText( it.label, px, fy + fh - cover / 2 + 0.5 );
+			}
+			ctx.restore();
+			// the glass
+			var gg = ctx.createLinearGradient( fx, fy, fx + fw, fy + fh );
+			gg.addColorStop( 0, "rgba(255,255,255,0.18)" ); gg.addColorStop( 0.5, "rgba(255,255,255,0)" );
+			ctx.fillStyle = gg; ctx.beginPath(); ctx.roundRect( fx, fy, fw, fh, 3 ); ctx.fill();
+			ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+			break;
 		case "jackin": case "jackout":
 			drawJack( (it.kind == "jackin" ? "in" : "out") + (it.slot || 1), it.x, it.y, it.label || (it.kind == "jackin" ? "IN" : "OUT"), it.kind == "jackin" ? "in" : "out" );
 			break;
@@ -280,8 +368,9 @@ function drawRear( mod, w, h )
 // one item alone, for the editor's palette (the rack's globals are made inert by the caller)
 function drawPreview( mod, it, back, st )
 {
-	M = mod; S = mod.settings; ST = st || { leds: {} };
-	if(!st) ST.leds[ it.id ] = 1; // an LED lit, to be seen (unless the state is given: live)
+	M = mod; S = mod.settings; ST = st || { leds: {}, meters: {}, still: true };
+	// an LED lit, a bar and a needle up, to be seen (unless the state is given: live)
+	if(!st) { ST.leds[ it.id ] = it.kind == "ledbar" ? 0.7 : 1; ST.meters[ it.id ] = [ 0.7, 0.5 ]; }
 	drawItems([ it ], back ? BACK : (COLORS[ S.color ] || COLORS.dark) );
 	M = null; S = null; ST = null;
 }
@@ -315,7 +404,7 @@ function register( type, half )
 	WR.registerSynth( type, {
 		title: "CUSTOM SYNTH",
 		description: "CUSTOM SYNTH: your own synth, built in the Synth Editor",
-		about: "Design a panel (knobs, sliders, buttons, LEDs, jacks) and wire modules behind it: oscillators, filters, envelopes, LFOs, sequencers, effects.",
+		about: "Design a panel (knobs, sliders, buttons, LEDs, LED bars, meters, jacks) and wire modules behind it: oscillators, filters, envelopes, LFOs, sequencers, effects.",
 		category: "Custom",
 		hidden: half,          // one card in ADD DEVICE; the editor switches the width
 		half: half,

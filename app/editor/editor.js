@@ -2,8 +2,8 @@
 // SYNTH EDITOR: builds the custom synths (editor/custom.js). A full-screen overlay over the rack:
 //   FRONT PANEL / BACK PANEL: the device as it looks in the rack (drawn by its own code, with the rack's
 //     widgets made inert). The palette shows each item as it will look; drag one onto the panel (it
-//     follows the mouse at its real size) or click it. Move items, resize sections, rectangles, sliders
-//     and buttons by their corner, lines by their ends. The back has the sockets: MAIN OUT, MIDI IN,
+//     follows the mouse at its real size) or click it. Move items, resize sections, rectangles, sliders,
+//     buttons, LED bars and meters by their corner, lines by their ends. The back has the sockets: MAIN OUT, MIDI IN,
 //     audio ins and outs.
 //   INSIDE: every item with inputs or outputs, and the modules (oscillators, filters...), as nodes with
 //     ports; drag a wire from an output to an input (an input takes one wire; dragging a wired input
@@ -29,6 +29,9 @@ var FRONT_ITEMS = [
 	["button", "BUTTON", "a gate while held", { kind: "button", w: 70, h: 26, label: "BUTTON" }],
 	["toggle", "SWITCH", "on / off", { kind: "toggle", w: 70, h: 26, label: "SWITCH", on: true }],
 	["led", "LED", "lights with its input", { kind: "led", color: "red" }],
+	["ledbar:h", "LED BAR", "lights up to its input's level", { kind: "ledbar", dir: "h", w: 130, h: 16, count: 10, color: "meter" }],
+	["ledbar:v", "LED BAR VERTICAL", "lights up to its input's level", { kind: "ledbar", dir: "v", w: 16, h: 110, count: 10, color: "meter" }],
+	["meter", "PANEL METER", "a needle shows its input", { kind: "meter", w: 140, h: 100, label: "LEVEL" }],
 	["jackin", "JACK IN", "signals from the rack", { kind: "jackin", label: "IN", slot: 1 }],
 	["jackout", "JACK OUT", "signals to the rack", { kind: "jackout", label: "OUT", slot: 1 }],
 	["label", "LABEL", "", { kind: "label", text: "LABEL", size: 18 }],
@@ -209,7 +212,7 @@ function setView( v )
 	renderPalette();
 	renderProps();
 	if(v == "inside") { renderInside(); if(!ed.fitted) { fitInside(); ed.fitted = true; } }
-	hint( v == "front" ? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, rectangle, slider or button to resize it, the ends of a line to change it. Delete removes; arrows nudge; Ctrl+D duplicates. Play the keys to hear the synth."
+	hint( v == "front" ? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, rectangle, slider, button, LED bar or meter to resize it, the ends of a line to change it. Delete removes; arrows nudge; Ctrl+D duplicates. Play the keys to hear the synth."
 		: v == "back" ? "The back: MAIN OUT L / R and MIDI IN are always there (move them where you like); add AUDIO IN and OUT sockets, labels, rectangles, lines, vents. Tab in the rack shows it."
 		: "Drag from an output (right) to an input (left) to wire them; drag a wired input to move or remove its wire. Drag a node by its title; drag the background to pan, the wheel zooms. A knob takes the range of the first input it is wired to." );
 }
@@ -341,6 +344,11 @@ function add( what, at, exact )
 		case "button": it.w = 70; it.h = 26; it.label = "BUTTON"; break;
 		case "toggle": it.w = 70; it.h = 26; it.label = "SWITCH"; break;
 		case "led": it.color = "red"; break;
+		case "ledbar":
+			it.dir = sub == "v" ? "v" : "h"; it.count = 10; it.color = "meter";
+			if(it.dir == "v") { it.w = 16; it.h = 120; } else { it.w = 140; it.h = 16; }
+			break;
+		case "meter": it.w = 140; it.h = 100; it.label = "LEVEL"; break;
 		case "jackin": case "jackout": case "ain": case "aout":
 			var max = kind == "ain" || kind == "aout" ? CAT.ASLOTS : CAT.SLOTS;
 			var used = list.filter(function(i){ return i.kind == kind; }).map(function(i){ return i.slot; });
@@ -459,7 +467,7 @@ function renderPanel()
 	}
 }
 
-function resizable( it ) { return ["section", "rect", "vents", "slider", "button", "toggle"].indexOf( it.kind ) >= 0; }
+function resizable( it ) { return ["section", "rect", "vents", "slider", "button", "toggle", "ledbar", "meter"].indexOf( it.kind ) >= 0; }
 // the handles of an item: its corner (resize) or the ends of a line
 function handles( it )
 {
@@ -532,7 +540,8 @@ function panelEvents()
 			if(d.end == 1) { it2.x = snap( p.x ); it2.y = snap( p.y ); }
 			else if(d.end == 2) { it2.x2 = snap( p.x ); it2.y2 = snap( p.y ); }
 			else if(it2.kind == "slider") it2.h = Math.max( 40, snap( d.h0 + p.y - d.sy ) );
-			else { it2.w = Math.max( 20, snap( d.w0 + p.x - d.sx ) ); it2.h = Math.max( 10, snap( d.h0 + p.y - d.sy ) ); }
+			else if(it2.kind == "meter") { it2.w = Math.max( 60, snap( d.w0 + p.x - d.sx ) ); it2.h = Math.max( 50, snap( d.h0 + p.y - d.sy ) ); }
+			else { it2.w = Math.max( it2.kind == "ledbar" ? 8 : 20, snap( d.w0 + p.x - d.sx ) ); it2.h = Math.max( it2.kind == "ledbar" ? 8 : 10, snap( d.h0 + p.y - d.sy ) ); }
 		}
 		else
 		{
@@ -836,7 +845,7 @@ function renderProps()
 	var refreshInside = function(){ if(ed.view == "inside") renderInside(); };
 	if(!isMod)
 	{
-		if(["knob", "slider", "button", "toggle", "jackin", "jackout", "led", "ain", "aout", "mainl", "mainr"].indexOf( x.kind ) >= 0)
+		if(["knob", "slider", "button", "toggle", "jackin", "jackout", "led", "ledbar", "meter", "ain", "aout", "mainl", "mainr"].indexOf( x.kind ) >= 0)
 			p.appendChild( field( "Label", textIn( x.label, function(v){ x.label = v.toUpperCase().substr( 0, 20 ); refreshInside(); } ) ) );
 		switch(x.kind)
 		{
@@ -856,6 +865,23 @@ function renderProps()
 				break;
 			case "led":
 				p.appendChild( field( "Colour", selIn( x.color || "red", Object.keys( CS.LED_COLORS ).map(function(k){ return [ k, k ]; }), function(v){ x.color = v; } ) ) );
+				break;
+			case "ledbar":
+				p.appendChild( field( "Direction", selIn( x.dir || "h", [["h", "Horizontal (left to right)"], ["v", "Vertical (bottom to top)"]], function(v){
+					if(v != (x.dir || "h")) { var t = x.w; x.w = x.h; x.h = t; } x.dir = v; renderProps(); } ) ) );
+				p.appendChild( field( "LEDs", numIn( x.count || 10, function(v){ x.count = Math.max( 2, Math.min( 48, Math.round( v ) ) ); }, 2, 48 ) ) );
+				p.appendChild( field( "Colour", selIn( x.color || "meter", [["meter", "green, amber, red"]].concat( Object.keys( CS.LED_COLORS ).map(function(k){ return [ k, k ]; }) ), function(v){ x.color = v; } ) ) );
+				p.appendChild( field( "Scale", selIn( x.scale || "lin", [["lin", "Linear: 0..1"], ["db", "Decibels: -48..0 dB"]], function(v){ x.scale = v; } ) ) );
+				p.appendChild( field( "Width", numIn( x.w || 140, function(v){ x.w = Math.max( 8, v ); }, 8, 1600 ) ) );
+				p.appendChild( field( "Height", numIn( x.h || 16, function(v){ x.h = Math.max( 8, v ); }, 8, 700 ) ) );
+				p.appendChild( $e( "p", "", "Lights as many LEDs as the level of its input (the size of the signal: audio, an envelope, a CV), and falls back slowly." ) );
+				break;
+			case "meter":
+				p.appendChild( field( "Scale", selIn( x.scale || "uni", [["uni", "0..1 (0 to 10)"], ["bi", "Centre zero: -1..1"]], function(v){ x.scale = v; } ) ) );
+				p.appendChild( field( "Face", selIn( x.face || "cream", [["cream", "Cream"], ["black", "Black"]], function(v){ x.face = v; } ) ) );
+				p.appendChild( field( "Width", numIn( x.w || 140, function(v){ x.w = Math.max( 60, v ); }, 60, 800 ) ) );
+				p.appendChild( field( "Height", numIn( x.h || 100, function(v){ x.h = Math.max( 50, v ); }, 50, 600 ) ) );
+				p.appendChild( $e( "p", "", "The needle shows the mean of its input: its size on 0..1 (audio reads as its level), or its value on centre zero (a CV, an LFO). Wire a JACK IN to it to measure what comes into a socket." ) );
 				break;
 			case "jackin": case "jackout": case "ain": case "aout":
 				var list = isBackItem( x ) ? s.back : s.items, max = x.kind == "ain" || x.kind == "aout" ? CAT.ASLOTS : CAT.SLOTS;
@@ -901,7 +927,7 @@ function renderProps()
 		}
 	}
 	// the inputs: their wire, or their constant
-	if(sp.ins.length && (isMod || x.kind == "led" || x.kind == "jackout" || x.kind == "aout"))
+	if(sp.ins.length && (isMod || x.kind == "led" || x.kind == "ledbar" || x.kind == "meter" || x.kind == "jackout" || x.kind == "aout"))
 	{
 		p.appendChild( $e( "h4", "", "INPUTS" ) );
 		sp.ins.forEach(function(inp){

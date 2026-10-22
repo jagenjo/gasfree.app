@@ -98,6 +98,8 @@ const CONTROLS = {
 	button:  { title: "BUTTON", outs: ["gate"], ins: [] },
 	toggle:  { title: "SWITCH", outs: ["on"], ins: [] },
 	led:     { title: "LED", outs: [], ins: [["in", "IN", 0, 1, 0, "lvl"]] },
+	ledbar:  { title: "LED BAR", outs: [], ins: [["in", "IN", 0, 1, 0, "lvl"]] },
+	meter:   { title: "PANEL METER", outs: [], ins: [["in", "IN", -1, 1, 0, "bi"]] },
 	jackin:  { title: "JACK IN", outs: ["out"], ins: [] },
 	jackout: { title: "JACK OUT", outs: [], ins: [["in", "IN", -1, 1, 0, "bi"]] },
 	label:   { title: "LABEL", outs: [], ins: [], deco: true },
@@ -163,7 +165,9 @@ function I(n, v, k) { const i = n.inIdx[k]; return i >= 0 ? v[i] : n.inConst[k];
 
 RUN.knob = RUN.slider = function(n, v) { n.cur += (n.target - n.cur) * 0.005; v[n.o] = n.cur; };
 RUN.button = RUN.toggle = function(n, v) { v[n.o] = n.target; };
-RUN.led = function(n, v, e) { const x = Math.abs(I(n, v, 0)); if (x > n.peak) n.peak = x; };
+RUN.led = RUN.ledbar = function(n, v, e) { const x = Math.abs(I(n, v, 0)); if (x > n.peak) n.peak = x; };
+// the meter: the mean of its input (and of its size) between two reports, for the needle
+RUN.meter = function(n, v, e) { const x = I(n, v, 0); n.acc += x; n.acc2 += Math.abs(x); n.count++; };
 RUN.jackin = function(n, v, e) {
 	const x = e.ins[n.slot] || 0, m = n.mode;
 	v[n.o] = m === "pitch" ? x : (m === "gate" ? (x > 1 ? 1 : 0) : x / 5);
@@ -441,7 +445,7 @@ class CustomDSP {
 				n.rv = [0, 23].map((sp) => ({ comb: COMBS.map((l) => new Float32Array(Math.round((l + sp) * k))), cp: [0, 0, 0, 0], lp: [0, 0, 0, 0],
 					ap: APS.map((l) => new Float32Array(Math.round((l + sp) * k))), apos: [0, 0] }));
 			}
-			n.count = 0;
+			n.count = 0; n.acc = n.acc2 = 0;
 			if (kind === "jackin" || kind === "jackout") { n.slot = clamp((item.slot | 0) - 1, 0, SLOTS - 1); n.mode = item.mode || "cv"; }
 			if (kind === "ain" || kind === "aout") n.slot = clamp((item.slot | 0) - 1, 0, ASLOTS - 1);
 			nodes.push(n); byId[n.id] = n;
@@ -500,9 +504,12 @@ class CustomDSP {
 	endBlock() {}
 
 	state() {
-		const leds = {};
-		for (const n of this.nodes) if (n.kind === "led") { leds[n.id] = Math.round(clamp(n.peak, 0, 1) * 100) / 100; n.peak *= 0.5; }
-		return { leds };
+		const leds = {}, meters = {}, r = (x) => Math.round(clamp(x, -1, 1) * 1000) / 1000;
+		for (const n of this.nodes) {
+			if (n.kind === "led" || n.kind === "ledbar") { leds[n.id] = Math.round(clamp(n.peak, 0, 1) * 1000) / 1000; n.peak *= 0.5; }
+			else if (n.kind === "meter") { const c = n.count || 1; meters[n.id] = [r(n.acc2 / c), r(n.acc / c)]; n.acc = n.acc2 = 0; n.count = 0; }
+		}
+		return { leds, meters };
 	}
 }
 CustomDSP.IN_IDS = IN_IDS;
