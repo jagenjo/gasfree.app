@@ -143,7 +143,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - **Held keys:** they hold the button down, so momentary buttons work (drone voices, pads, plates, footswitches). A lever switch moves to its next position.
   - **Which device:** a thin yellow line on its left shows the device the keys go to.
   - **Seeing the keys:** hold **Shift** to show each button's key on it, with the device outlined. A device with more buttons than keys has banks; **`** switches between them.
-  - **QWERTY piano:** when it is on (keys device), the letters play notes instead.
+  - **QWERTY piano:** when it is on (keys device), the letters play notes and the devices' key shortcuts are off: no key presses a button, and Shift shows nothing. Space (play) and Tab (front / back) still work.
 - **Adding another synth:** register it from a pair of files in `devices/`:
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
   - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
@@ -578,7 +578,7 @@ MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, a **M
 The **KEYS** row above the synth is where notes come in:
 
 - **MIDI IN**: *ENABLE* asks the browser for MIDI access; ◀ / ▶ pick one input or all of them. The LCD shows the device and the notes being held.
-- **Keyboard**: a 3-octave on-screen keyboard (drag across it to glide), *OCT −* / *OCT +*, and *QWERTY*, which turns the computer keyboard into a piano: `A S D F G H J K L ; '` are white keys, `W E T Y U O P` black keys, `Z` / `X` shift the octave. While QWERTY is on, `T` plays F# instead of triggering.
+- **Keyboard**: a 3-octave on-screen keyboard (drag across it to glide), *OCT −* / *OCT +*, and *QWERTY*, which turns the computer keyboard into a piano: `A S D F G H J K L ; '` are white keys, `W E T Y U O P` black keys, `Z` / `X` shift the octave. While QWERTY is on, the other keys don't press the devices' buttons.
 - **Split**: *SPLIT* divides the keyboard at the marker above the keys (drag it). The lower zone drives KEY 1 / GATE 1, the upper zone KEY 2 / GATE 2. Without split both pairs carry all notes.
 - **Outputs**: GATE 1 / 2 (5 V while a key of that zone is held), KEY 1 / 2 (1 V/oct, C4 = 0 V, last-note priority), TRIG (a 5 ms pulse on every key press, whatever the split), and MIDI OUT on the back. All notes from every source (MIDI device, on-screen keys, QWERTY, the song) go to MIDI OUT.
 

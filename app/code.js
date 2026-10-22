@@ -348,6 +348,8 @@ function keyUp( code )
 // SHIFT: the keys over the buttons, the target outlined (rack coordinates, the rack's transform)
 function drawKeyOverlay()
 {
+	if(piano.enabled) // QWERTY: the keyboard is a piano, the devices get no keys
+		return;
 	var now = performance.now(), r = keyctl.targetRect;
 	(keyctl.drawn || []).forEach(function(b, i){
 		var f = keyctl.flash[ b.id ];
@@ -2860,8 +2862,9 @@ function pianoAllOff()
 function setPiano( enabled )
 {
 	pianoAllOff();
+	keyReleaseAll();
 	piano.enabled = enabled;
-	setStatus( enabled ? "Keyboard piano on: A-' white keys, W E T Y U O P black keys, Z / X octave" : "Keyboard piano off" );
+	setStatus( enabled ? "Keyboard piano on: A-' white keys, W E T Y U O P black keys, Z / X octave (the devices' key shortcuts are off)" : "Keyboard piano off: the keys press the buttons of the device in the middle again" );
 }
 
 window.addEventListener("keydown", function(e){
@@ -2904,8 +2907,8 @@ window.addEventListener("keydown", function(e){
 		e.preventDefault();
 		return;
 	}
-	// the buttons of the device in the middle of the screen
-	if(keyDown( e.code ))
+	// the buttons of the device in the middle of the screen (not with QWERTY on: the keys are a piano)
+	if(!piano.enabled && keyDown( e.code ))
 	{
 		act(function(){});
 		e.preventDefault();
@@ -2923,7 +2926,7 @@ window.addEventListener("keyup", function(e){
 });
 // SHIFT shows the keys on the buttons (not while typing)
 window.addEventListener("keydown", function(e){
-	if(e.key == "Shift" && !isTextField( e.target ))
+	if(e.key == "Shift" && !isTextField( e.target ) && !piano.enabled)
 		keyctl.overlay = true;
 });
 // keys released while the window is not focused never send keyup
