@@ -26,7 +26,9 @@ if [ -z "$TYPES" ]; then
 		const fs=require("fs"), vm=require("vm");
 		const sb={ console, performance:{ now:()=>0 } }; vm.createContext(sb);
 		vm.runInContext(fs.readFileSync("webrack.js","utf8"), sb);
-		for(const f of fs.readdirSync("devices")) if(!/-worklet\.js$/.test(f)) vm.runInContext(fs.readFileSync("devices/"+f,"utf8"), sb);
+		const files=fs.readdirSync("devices");
+		for(const f of files) if(/-worklet\.js$/.test(f)) try { vm.runInContext(fs.readFileSync("devices/"+f,"utf8"), sb); } catch(e) {} // tables some panels use (midifx)
+		for(const f of files) if(!/-worklet\.js$/.test(f)) vm.runInContext(fs.readFileSync("devices/"+f,"utf8"), sb);
 		console.log(vm.runInContext("WR.order", sb).join(" "));')
 fi
 

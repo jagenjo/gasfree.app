@@ -12,6 +12,8 @@
 // the module id ("subharm.vco1", "comp.in_l"). Cables are copied with one sample of delay. CV inputs
 // take one cable; audio inputs (rear sockets) sum all the cables plugged in. MIDI reaches a module
 // through a cable from the keys' MIDI output into its MIDI IN, or with its MASTER MIDI switch on.
+// A module with a MIDI OUT (the MIDI FX) sends its notes only to the modules cabled from it
+// (midiFrom); a module reached only that way doesn't hear the keys' MIDI.
 //
 // MIDI notes come in as { type: "note", channel 1..16, note, on }: one note stack per channel (plus
 // one for OMNI, with every note) turns them into the mono { type: "midi", pitch, gate, retrigger }
@@ -67,6 +69,7 @@ class RackProcessor extends AudioWorkletProcessor {
 		this.stacks = [];    // held notes per channel, 0 = all channels (OMNI)
 		for (let c = 0; c <= 16; c++) this.stacks.push([]);
 		this.queue = [];     // scheduled messages, sorted by frame
+		this.midiDepth = 0;  // MIDI OUT into MIDI OUT...: how deep, against loops
 		this.port.onmessage = (e) => this.onMessage(e.data);
 	}
 
@@ -74,7 +77,7 @@ class RackProcessor extends AudioWorkletProcessor {
 	// mono modules (poly: the polyphonic ones get the raw notes instead, see noteEvent)
 	toChannel(channel, msg, omni, poly) {
 		for (const mod of this.modules)
-			if (mod.dsp.midiConnected && !!mod.dsp.constructor.POLY === !!poly &&
+			if (mod.onBus && mod.dsp.midiConnected && !!mod.dsp.constructor.POLY === !!poly &&
 				(omni ? mod.midiChannel === 0 : mod.midiChannel === channel && channel > 0))
 				mod.dsp.message(msg);
 	}
@@ -83,7 +86,7 @@ class RackProcessor extends AudioWorkletProcessor {
 		const ch = Math.max(1, Math.min(16, m.channel | 0));
 		// polyphonic modules allocate their own voices: every note on / off of their channel (or all)
 		for (const mod of this.modules)
-			if (mod.dsp.midiConnected && mod.dsp.constructor.POLY && (mod.midiChannel === 0 || mod.midiChannel === ch))
+			if (mod.onBus && mod.dsp.midiConnected && mod.dsp.constructor.POLY && (mod.midiChannel === 0 || mod.midiChannel === ch))
 				mod.dsp.message({ type: "note", note: m.note, on: !!m.on, vel: m.vel === undefined ? 1 : m.vel });
 		for (const k of [ch, 0]) {
 			const st = this.stacks[k];
@@ -104,8 +107,33 @@ class RackProcessor extends AudioWorkletProcessor {
 
 	notesOff() {
 		for (const st of this.stacks) st.length = 0;
-		for (const mod of this.modules)
+		for (const mod of this.modules) {
+			mod.fxStack = [];
 			if (mod.dsp.midiConnected) mod.dsp.message(mod.dsp.constructor.POLY ? { type: "allNotesOff" } : { type: "midi", gate: false });
+		}
+	}
+
+	// MIDI from a module's MIDI OUT (`dsp`) to the modules cabled from it, whatever their channel:
+	// the notes as they are to the polyphonic ones, through a note stack (last note priority) to the
+	// mono ones; bends as they are
+	midiFrom(dsp, m) {
+		const src = dsp.rackMod;
+		if (!src || !src.midiTargets.length || this.midiDepth > 8) return;
+		this.midiDepth++;
+		for (const mod of src.midiTargets) {
+			if (m.type !== "note") { mod.dsp.message(m); continue; }
+			if (mod.dsp.constructor.POLY) { mod.dsp.message({ type: "note", note: m.note, on: !!m.on, vel: m.vel === undefined ? 1 : m.vel }); continue; }
+			const st = mod.fxStack || (mod.fxStack = []);
+			const i = st.indexOf(m.note);
+			if (i >= 0) st.splice(i, 1);
+			let msg;
+			if (m.on) { st.push(m.note); msg = { type: "midi", pitch: (m.note - 60) / 12, gate: true, retrigger: true, velocity: m.vel }; }
+			else if (i < 0) continue;
+			else if (st.length) msg = { type: "midi", pitch: (st[st.length - 1] - 60) / 12, gate: true, retrigger: false };
+			else msg = { type: "midi", gate: false };
+			mod.dsp.message(msg);
+		}
+		this.midiDepth--;
 	}
 
 	schedule(m) {
@@ -167,8 +195,9 @@ class RackProcessor extends AudioWorkletProcessor {
 			if (!Dsp) continue;
 			let mod = this.byId[m.id];
 			if (!mod || mod.type !== m.type) {
-				mod = { id: m.id, type: m.type, dsp: new Dsp() };
+				mod = { id: m.id, type: m.type, dsp: new Dsp(), midiTargets: [], onBus: false };
 				mod.dsp.host = this;
+				mod.dsp.rackMod = mod;
 				mod.dsp.message({ type: "scale", scale: this.scale });
 			}
 			// native modules take the send / return slots in rack order (the main thread does the same)
@@ -202,7 +231,8 @@ class RackProcessor extends AudioWorkletProcessor {
 	setPatches(patches) {
 		const nodes = [this].concat(this.modules.map(m => m.dsp));
 		for (const n of nodes) { n.patched.fill(0); n.ins.fill(0); if (n.outPatched) n.outPatched.fill(0); }
-		const midi = {};
+		const midi = {}, fed = {};
+		for (const mod of this.modules) mod.midiTargets = [];
 		let c = 0, z = 0;
 		this.srcArr.length = 0;
 		this.dstArr.length = 0;
@@ -212,6 +242,13 @@ class RackProcessor extends AudioWorkletProcessor {
 				const dot = p[1].indexOf(".");
 				const mod = dot > 0 && this.byId[p[1].substr(0, dot)];
 				if (mod && mod.dsp.constructor.MIDI_IN === p[1].substr(dot + 1)) midi[mod.id] = true;
+				continue;
+			}
+			const sdot = p[0].indexOf("."), smod = sdot > 0 && this.byId[p[0].substr(0, sdot)];
+			if (smod && smod.dsp.constructor.MIDI_OUT && smod.dsp.constructor.MIDI_OUT === p[0].substr(sdot + 1)) { // a module's MIDI OUT
+				const dot = p[1].indexOf(".");
+				const mod = dot > 0 && this.byId[p[1].substr(0, dot)];
+				if (mod && mod !== smod && mod.dsp.constructor.MIDI_IN === p[1].substr(dot + 1) && smod.midiTargets.indexOf(mod) < 0) { smod.midiTargets.push(mod); fed[mod.id] = true; }
 				continue;
 			}
 			const src = this.resolve(p[0], "out"), dst = this.resolve(p[1], "in");
@@ -227,7 +264,12 @@ class RackProcessor extends AudioWorkletProcessor {
 		}
 		this.numCables = c;
 		this.numZero = z;
-		for (const mod of this.modules) mod.dsp.setMidiConnected(!!midi[mod.id] || mod.midiMaster);
+		for (const mod of this.modules) {
+			mod.onBus = !!midi[mod.id] || mod.midiMaster;
+			const was = mod.dsp.midiConnected;
+			mod.dsp.setMidiConnected(mod.onBus || !!fed[mod.id]);
+			if (!was || !fed[mod.id]) mod.fxStack = [];
+		}
 	}
 
 	process(inputs, outputs) {

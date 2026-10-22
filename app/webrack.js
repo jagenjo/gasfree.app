@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261022b"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261022c"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -395,6 +395,24 @@ WR.audioThru = function( def )
 	return null;
 }
 
+// before removing module `id` from settings `s`: the devices its MIDI OUT fed (a MIDI FX) get the
+// MIDI it got: the cable into its MIDI IN, or MASTER MIDI
+WRContext.bridgeMidi = function( s, id )
+{
+	var m = s.modules.find(function(o){ return o.id == id; });
+	var def = m && WR.types[ m.type ];
+	if(!def || !def.midi_in)
+		return;
+	var prefix = id + ".", types = WRContext.jackTypes( s.modules );
+	var fed = s.patches.filter(function(p){ return p[0].indexOf( prefix ) == 0 && types[ p[0] ] == "midiout" && p[1].indexOf( prefix ) != 0; });
+	var src = s.patches.find(function(p){ return p[1] == WR.jackId( id, def.midi_in ); });
+	fed.forEach(function(p){
+		var dm = s.modules.find(function(o){ return p[1].indexOf( o.id + "." ) == 0; });
+		if(src) s.patches.push([ src[0], p[1], src[2] ]);
+		else if(m.settings.midi_master && dm) dm.settings.midi_master = true;
+	});
+}
+
 // before removing module `id` from settings `s`: what came into it goes on to where it went, so the
 // audio path stays whole. An unpatched IN R takes IN L (as the sockets do), and is left to the
 // receiving socket's own normalling when that is the R of the same pair
@@ -432,6 +450,7 @@ WRContext.prototype.removeModule = function( id )
 {
 	var prefix = id + ".";
 	WRContext.bridgeAudio( this.settings, id );
+	WRContext.bridgeMidi( this.settings, id );
 	this.settings.modules = this.settings.modules.filter(function(m){ return m.id != id; });
 	this.settings.patches = this.settings.patches.filter(function(p){ return p[0].indexOf( prefix ) != 0 && p[1].indexOf( prefix ) != 0; });
 	delete this.module_state[ id ];

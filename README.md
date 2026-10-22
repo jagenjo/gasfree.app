@@ -41,6 +41,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
+| `app/devices/midifx.js`, `app/devices/midifx-worklet.js` | MIDI FX, effects on the notes between the keys and the synths (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reverb.js`, `app/devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `app/data/patches.json` | factory patches |
 | `LICENSE` | the MIT license, for everything but the reverb impulses |
@@ -309,6 +310,22 @@ A thin row of 8 channels to tidy up long cables. Each channel has two sockets on
 
 Patch a signal into one Reroute's front, cable its back to another Reroute's back (Tab), and take the signal out of that one's front, anywhere in the rack. It is listed under Utility in Add device.
 
+## MIDI FX
+
+Effects on the notes: it sits between the keys (or the song, or a GRID 32) and the synths. Its **MIDI IN** on the back takes the notes (MASTER MIDI or a cable, on its channel); its **MIDI OUT** sends them on to every device cabled from it. Added to the rack, it goes in front of the last synth that hears the keys: its MIDI OUT into that synth's MIDI IN, whose MASTER MIDI goes off. Removed, the synths it fed get the keys' MIDI back. It is listed under Modulation in Add device.
+
+The notes go through the sections in this order:
+
+- **TIMING** (ON): each note-on moves to the next step of the **GRID** (1/2 to 1/32, triplets too); the note keeps its length. **CHANCE**: how many of the notes play (100%: all).
+- **PITCH**: **TRANSPOSE** (±24 semitones, plus the TRANSP CV, 1 V/oct). **HARMONY** adds notes to each one: OCTAVE, OCT DOWN, FIFTH, POWER, MAJOR, MINOR, SUS2, SUS4, MAJ7, MIN7, DOM7, ADD9, or chords of the scale (3RD, TRIAD, 7TH IN SCALE, 6TH BELOW), built on the SCALE when it is on and on the major scale of the note otherwise. **SCALE** (on / off) moves every note, the harmony too, to the nearest note of the scale: MAJOR, MINOR, DORIAN, PHRYGIAN, LYDIAN, MIXOLYDIAN, HARM MINOR, MAJ PENTA, MIN PENTA, BLUES, WHOLE TONE, CHROMATIC, from its **ROOT**.
+- **ARP** (ON): the notes held, played one at a time. **MODE**: UP, DOWN, UP DOWN, RANDOM, AS PLAYED, or CHORD (all of them each step). **RATE** (1/2 to 1/32), **OCTAVES** (1 to 4), **GATE** (how much of the step a note lasts). **LATCH**: the notes keep playing after the keys are let go, until a new chord.
+- **ECHO** (ON): each note repeated **REPEATS** times (1 to 8), every **TIME** (1/2 to 1/32), each repeat at **FEEDBACK** of the velocity of the one before, and **PITCH** semitones higher or lower (±12): rising or falling echoes. A repeat lasts as long as the note.
+- **VELOCITY**: **AMOUNT** scales it (0 to 200%), **RANDOM** varies each note.
+- **ON** (under the screen): off, the notes go through as they are. The screen shows the notes in and out and what is on; IN and OUT light with the notes. **PRESETS**: THRU, CHORDS, ARP, ECHOES, RISING, SPARKLE.
+- **Time:** the steps follow the rack's tempo, or CLOCK IN (a step a pulse) when it is patched.
+- **CV:** CLOCK and TRANSP in; PITCH (1 V/oct), GATE and VEL (0 to 5 V) out, from the last note out, to play a modular voice as well.
+- Factory patches: *Arp + Echo into Mount*, *Chords in A Minor* (into Para D), *Rising Echoes* (into Mystic), under RACK.
+
 ## Cosmos
 
 A multi-algorithm stereo reverb pedal. It is a half-width device with stereo IN / OUT on the back, with a 12 character, 14 segment display.
@@ -548,11 +565,12 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
 
 ## MIDI on the back
 
-MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, and a **MIDI IN** on the Subharm, Brother-32 and Maze.
+MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, a **MIDI IN** on the devices that take notes, and the **MIDI FX**'s MIDI IN and MIDI OUT.
 
 - **Cable or MASTER MIDI:** a MIDI cable from MIDI OUT to a MIDI IN carries the notes. Or switch on **MASTER MIDI** under the MIDI IN to get them without a cable; new synths start that way. Switching it on unplugs a MIDI IN cable, and patching a cable switches it off.
 - **Channels:** the channel selector under each MIDI IN, a red 7-segment display with ▲ / ▼ buttons (or the mouse wheel over the display), picks the channel the synth listens to: `--` for OMNI (every channel, the default) or 01–16.
 - **Keys:** the same selector under the keys' MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
+- **A device's MIDI OUT** (the MIDI FX): its notes go only to the devices cabled from it, whatever channel they listen to. A device fed only that way doesn't hear the keys. One MIDI OUT can feed several devices; a MIDI IN takes one cable.
 - **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
 
 ## Keys device and MIDI

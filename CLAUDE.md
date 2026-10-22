@@ -45,6 +45,7 @@ GASFREE (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of th
 - A DSP class has static `IN_IDS` / `OUT_IDS` (and `MIDI_IN`), instance arrays `ins`, `outs`, `patched`, and the methods `setSettings(s)`, `message(m)`, `beginBlock()`, `tick()` (one sample), `endBlock()`, `state()` (sent back to the UI, e.g. LEDs, meters, playheads). Read `devices/hyper-worklet.js` or `devices/tape-worklet.js` as a short example.
 - Cables are copied every sample, so everything is sample-accurate. Front signals are ±5 V; rear audio is line level (±1).
 - The main thread posts a device's whole settings object whenever it changes (compared with `JSON.stringify`). When a module's type changes under the same id (e.g. the custom synth switching between full and half width), a new DSP instance is created; a message sent just before the swap goes to the old instance.
+- MIDI: the keys' MIDI OUT (`kb_midi`) is one bus, by channel, to the devices cabled from it or on MASTER MIDI. A DSP class with a static `MIDI_OUT` (the MIDI FX) sends notes with `host.midiFrom(this, msg)` only to the devices cabled from that socket; `POLY` devices get raw notes, mono ones a note stack. Don't name a DSP method `send`: the rack sets `dsp.send` for the send / return slots.
 - The convolution reverb is native WebAudio nodes, bridged through one of 8 send / return slots (`WR.SLOTS`).
 
 ### Devices
@@ -135,5 +136,5 @@ The app, README and home page use plain, short, factual sentences: what a contro
 ## Devices at a glance
 
 Synths: SUBHARM (polyrhythmic), DRAM (analog percussion), BROTHER-32 (semi-modular with a 32 step sequencer), MAZE (generative), MYSTIC (wave scanning poly), MOUNT (8 voice wavetable poly), PARA D (4 oscillator paraphonic), LLM DRAM (80s drum machine), LUNAR 21 (drone machine), CUSTOM SYNTH (Synth Editor).
-Sequencing and modulation: GRID 32 (32×32 note matrix), dual LFO, the song sequencer, the KEYS device (on-screen keys, QWERTY piano, MIDI).
+Sequencing and modulation: GRID 32 (32×32 note matrix), MIDI FX (timing, harmony, scale, arp, echo on the notes), dual LFO, the song sequencer, the KEYS device (on-screen keys, QWERTY piano, MIDI).
 Mixing and effects: mixer, compressor (with scope), reverb, delay, UNIVERSE (granular looper), COSMOS (12 algorithm reverb), HYPER (distortion / bit crusher), TAPE (wow, flutter, saturation, hiss, tape stop), REROUTE (front to back).
