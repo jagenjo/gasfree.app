@@ -21,7 +21,7 @@
 <meta name="twitter:image" content="https://gasfree.app/img/share.jpg" />
 <link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
-<link href="editor/editor.css?v=20261022d" rel="stylesheet">
+<link href="editor/editor.css?v=20261022e" rel="stylesheet">
 <style>
 	* { margin: 0; padding: 0; box-sizing: border-box; }
 	html, body { height: 100%; background: #0b0b0b; color: #e8e4dc; overflow: hidden; }
@@ -36,6 +36,9 @@
 	input[type=range] { padding: 0; width: 90px; accent-color: #c9483a; }
 	#scale { width: 210px; }
 	#patch-select { max-width: 190px; }
+	#cpu { min-width: 62px; padding: 3px 6px; border-radius: 4px; color: #8c8a84; font-size: 13px; text-align: center;
+		background: linear-gradient( to right, var(--cpu-c, #3a3a37) var(--cpu, 0%), #232321 var(--cpu, 0%) ); }
+	#cpu.warm { color: #f0a43a; } #cpu.hot { color: #ff6a5a; }
 	#status { color: #8c8a84; flex: 1; min-width: 160px; text-align: right; }
 	#help-wrap { position: relative; }
 	#opt-midimap { display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; font: 12px Arial, Helvetica, sans-serif; letter-spacing: 0; }
@@ -111,6 +114,7 @@
 	<span class="title">GASFREE</span>
 	<div class="group">
 		<button id="power" title="Start / suspend the audio engine">Audio off</button>
+		<span id="cpu" title="CPU: how much of the real time the audio engine takes to make the sound (every device; the reverbs' native nodes not counted). Near 100% the sound breaks up.">CPU --</span>
 	</div>
 	<div id="sessions-wrap">
 		<button id="sessions" title="Your sessions, saved automatically in this browser">Sessions &#9662;</button>
@@ -181,6 +185,8 @@
 				<li>Choose the MIDI input in the keys device. Synths get their notes through MASTER MIDI or a cable on the back, on the channel set there.</li>
 				<li><b>MIDI learn</b> (Options): click a knob, fader or button, then move a controller (or press a key / pad) to map it. The mappings are listed in Options, each with a button to remove it; they are saved with the rack.</li>
 			</ul>
+			<h3>CPU</h3>
+			<ul><li><b>CPU</b> next to Audio on: how much of the real time the audio engine needs (twice a second). Amber over 60%, red over 85%; near 100% the sound breaks up. Removing heavy devices (polyphonic synths, reverbs, granular effects) lowers it.</li></ul>
 			<h3>Patches and sessions</h3>
 			<ul>
 				<li><b>Sessions</b> save themselves in this browser as you play. <b>Save as…</b> keeps a patch; <b>Export</b> downloads it (<b>Shift + Export</b>: copies it to the clipboard); <b>Import</b> loads one.</li>
@@ -198,37 +204,37 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="analytics.js?v=20261022d"></script>
-<script src="webrack.js?v=20261022d"></script>
+<script src="analytics.js?v=20261022e"></script>
+<script src="webrack.js?v=20261022e"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261022d"></script>
-<script src="devices/dram.js?v=20261022d"></script>
-<script src="devices/b32.js?v=20261022d"></script>
-<script src="devices/maze.js?v=20261022d"></script>
-<script src="devices/mystic.js?v=20261022d"></script>
-<script src="devices/llmdram.js?v=20261022d"></script>
-<script src="devices/lunar.js?v=20261022d"></script>
-<script src="devices/mixer.js?v=20261022d"></script>
-<script src="devices/lfo.js?v=20261022d"></script>
-<script src="devices/comp.js?v=20261022d"></script>
-<script src="devices/reverb.js?v=20261022d"></script>
-<script src="devices/delay.js?v=20261022d"></script>
-<script src="devices/universe.js?v=20261022d"></script>
-<script src="devices/hyper.js?v=20261022d"></script>
-<script src="devices/tape.js?v=20261022d"></script>
-<script src="devices/cosmos.js?v=20261022d"></script>
-<script src="devices/pollyd.js?v=20261022d"></script>
-<script src="devices/grid.js?v=20261022d"></script>
-<script src="devices/mount.js?v=20261022d"></script>
-<script src="devices/reroute.js?v=20261022d"></script>
-<script src="devices/midifx-worklet.js?v=20261022d"></script>
-<script src="devices/midifx.js?v=20261022d"></script>
+<script src="devices/subharm.js?v=20261022e"></script>
+<script src="devices/dram.js?v=20261022e"></script>
+<script src="devices/b32.js?v=20261022e"></script>
+<script src="devices/maze.js?v=20261022e"></script>
+<script src="devices/mystic.js?v=20261022e"></script>
+<script src="devices/llmdram.js?v=20261022e"></script>
+<script src="devices/lunar.js?v=20261022e"></script>
+<script src="devices/mixer.js?v=20261022e"></script>
+<script src="devices/lfo.js?v=20261022e"></script>
+<script src="devices/comp.js?v=20261022e"></script>
+<script src="devices/reverb.js?v=20261022e"></script>
+<script src="devices/delay.js?v=20261022e"></script>
+<script src="devices/universe.js?v=20261022e"></script>
+<script src="devices/hyper.js?v=20261022e"></script>
+<script src="devices/tape.js?v=20261022e"></script>
+<script src="devices/cosmos.js?v=20261022e"></script>
+<script src="devices/pollyd.js?v=20261022e"></script>
+<script src="devices/grid.js?v=20261022e"></script>
+<script src="devices/mount.js?v=20261022e"></script>
+<script src="devices/reroute.js?v=20261022e"></script>
+<script src="devices/midifx-worklet.js?v=20261022e"></script>
+<script src="devices/midifx.js?v=20261022e"></script>
 <!-- the Synth Editor and its custom synths: kept apart from the devices above -->
-<script src="editor/custom-worklet.js?v=20261022d"></script>
-<script src="editor/custom.js?v=20261022d"></script>
-<script src="code.js?v=20261022d"></script>
-<script src="sequencer.js?v=20261022d"></script>
-<script src="sessions.js?v=20261022d"></script>
-<script src="editor/editor.js?v=20261022d"></script>
+<script src="editor/custom-worklet.js?v=20261022e"></script>
+<script src="editor/custom.js?v=20261022e"></script>
+<script src="code.js?v=20261022e"></script>
+<script src="sequencer.js?v=20261022e"></script>
+<script src="sessions.js?v=20261022e"></script>
+<script src="editor/editor.js?v=20261022e"></script>
 </body>
 </html>

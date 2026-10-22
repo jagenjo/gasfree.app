@@ -33,6 +33,11 @@ const GATE_V = 5;
 const PULSE_TIME = 0.005;
 const STATE_INTERVAL = 1024; // samples between UI state reports
 const MAX_CABLES = 512;
+const LOAD_INTERVAL = 0.5; // seconds between CPU load reports
+// the clock for the CPU load: performance.now() where the worklet has it, else Date.now() (whole
+// milliseconds: over half a second of blocks the rounding averages out)
+const HAS_PERF = typeof performance !== "undefined" && typeof performance.now === "function";
+const nowMs = HAS_PERF ? () => performance.now() : () => Date.now();
 
 function rackTanh(x) {
 	if (x < -3) return -1;
@@ -70,6 +75,8 @@ class RackProcessor extends AudioWorkletProcessor {
 		for (let c = 0; c <= 16; c++) this.stacks.push([]);
 		this.queue = [];     // scheduled messages, sorted by frame
 		this.midiDepth = 0;  // MIDI OUT into MIDI OUT...: how deep, against loops
+		this.busyMs = 0;     // time spent in process() since the last CPU load report
+		this.loadFrames = 0; // ... and the audio it made, in frames
 		this.port.onmessage = (e) => this.onMessage(e.data);
 	}
 
@@ -276,6 +283,7 @@ class RackProcessor extends AudioWorkletProcessor {
 		const out = outputs[0];
 		const L = out[0], R = out[1];
 		if (!this.s || !L) return true;
+		const t0 = nowMs();
 
 		const n = L.length;
 		const ins = this.ins, outs = this.outs, patched = this.patched;
@@ -335,12 +343,20 @@ class RackProcessor extends AudioWorkletProcessor {
 		for (let m = 0; m < nm; m++) mods[m].endBlock(n);
 
 		this.stateCounter += n;
+		let load;
 		if (this.stateCounter >= STATE_INTERVAL) {
 			this.stateCounter = 0;
 			const modules = {};
 			for (const mod of this.modules) modules[mod.id] = mod.dsp.state();
-			this.port.postMessage({ type: "state", modules: modules });
+			// CPU load: the time spent in process() over the time the audio it made lasts (1 = all of it)
+			if (this.loadFrames >= LOAD_INTERVAL * sampleRate) {
+				load = this.busyMs / (this.loadFrames / sampleRate * 1000);
+				this.busyMs = 0; this.loadFrames = 0;
+			}
+			this.port.postMessage({ type: "state", modules: modules, load: load, timer: HAS_PERF ? "performance" : "date" });
 		}
+		this.busyMs += nowMs() - t0;
+		this.loadFrames += n;
 		return true;
 	}
 }

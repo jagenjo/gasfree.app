@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261022d"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261022e"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -97,6 +97,7 @@ function WRContext()
 	this.io_devices = { outputs: [], inputs: [], status: "" };
 	this.input = null;  // { stream, source } while the audio input is on
 	this.meter = [0, 0]; // master peak level per channel, linear
+	this.cpu = null;     // the audio engine's CPU load (0..1, smoothed), null until it reports
 	this._sent = null;
 	this._initializing = null;
 }
@@ -292,7 +293,14 @@ WRContext.prototype.init = function()
 		});
 		node.port.onmessage = function(e) {
 			if(e.data.type == "state")
+			{
 				that.onState( e.data.modules );
+				if(e.data.load !== undefined) // the audio engine's CPU load, twice a second (1 = all of the real time)
+				{
+					that.cpu = that.cpu == null ? e.data.load : that.cpu * 0.5 + e.data.load * 0.5;
+					that.cpu_timer = e.data.timer;
+				}
+			}
 		};
 
 		that.buildMaster( ctx, node );

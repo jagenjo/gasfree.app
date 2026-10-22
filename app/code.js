@@ -2953,9 +2953,23 @@ function updateToolbar()
 	$("power").classList.toggle( "on", !!running );
 }
 
+var cpu_shown = "";
 function updateToolbarFrame()
 {
 	rack.updateIO();
+	// the audio engine's CPU load: a number and a bar behind it, amber over 60%, red over 85%
+	var running = rack.context && rack.context.state == "running", c = rack.cpu;
+	var text = running && c != null ? "CPU " + Math.round( c * 100 ) + "%" : "CPU --";
+	if(text != cpu_shown)
+	{
+		cpu_shown = text;
+		var el = $("cpu"), p = running && c != null ? Math.min( 100, c * 100 ) : 0;
+		el.textContent = text;
+		el.style.setProperty( "--cpu", p.toFixed( 1 ) + "%" );
+		el.style.setProperty( "--cpu-c", p > 85 ? "#6b231c" : (p > 60 ? "#5a4216" : "#3a3a37") );
+		el.classList.toggle( "warm", p > 60 && p <= 85 );
+		el.classList.toggle( "hot", p > 85 );
+	}
 }
 
 // front / rear of the rack (Tab)
