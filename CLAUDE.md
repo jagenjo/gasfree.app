@@ -20,6 +20,7 @@ GASFREE (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of th
 | path | what |
 |---|---|
 | `index.html` | redirects to `home/` |
+| `LICENSE` | MIT; the reverb impulses keep their own `license.txt` |
 | `home/` | the landing page: features, screenshots (`home/img/`), the logo, share preview (`home/img/share.jpg`, og/twitter tags) |
 | `app/` | the app (open `app/index.html`) |
 | `app/webrack.js` | main thread controller: device registry (`WR.registerSynth`), settings, patches, the audio graph, Web MIDI, keys |
