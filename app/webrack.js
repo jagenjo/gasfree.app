@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261022e"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261022f"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -37,7 +37,7 @@ WR.VERSION = "20261022e"; // bump together with the ?v= in index.html so browser
 //   size(layout),                 [w, h] of the panel in its own coordinates
 //   draw(module),                 draws the panel (code.js widgets)
 //   transport(module, action, value)  play / reset / next / trigger from the computer keyboard
-//   tempo(s)                      BPM for the delay's tempo sync, if it has a clock
+//   tempo(s)                      BPM for the delay's tempo sync, if it has a clock (0 / null: it follows the rack's)
 // }
 WR.registerSynth = function( type, def )
 {
@@ -528,8 +528,9 @@ WRContext.prototype.tempo = function()
 	for(var i = 0; i < mods.length; ++i)
 	{
 		var def = WR.types[ mods[i].type ];
-		if(def.tempo)
-			return def.tempo( mods[i].settings );
+		var t = def.tempo ? def.tempo( mods[i].settings ) : 0;
+		if(t) // a device that follows the rack's tempo (its SYNC on) gives none
+			return t;
 	}
 	return 120;
 }

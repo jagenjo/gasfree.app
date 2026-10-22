@@ -21,7 +21,7 @@
 <meta name="twitter:image" content="https://gasfree.app/img/share.jpg" />
 <link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
-<link href="editor/editor.css?v=20261022e" rel="stylesheet">
+<link href="editor/editor.css?v=20261022f" rel="stylesheet">
 <style>
 	* { margin: 0; padding: 0; box-sizing: border-box; }
 	html, body { height: 100%; background: #0b0b0b; color: #e8e4dc; overflow: hidden; }
@@ -192,6 +192,8 @@
 				<li><b>Sessions</b> save themselves in this browser as you play. <b>Save as…</b> keeps a patch; <b>Export</b> downloads it (<b>Shift + Export</b>: copies it to the clipboard); <b>Import</b> loads one.</li>
 				<li><b>Randomize</b> gives every synth a random sound. <b>Add device</b> lists everything you can insert.</li>
 			</ul>
+			<h3>MINIMAD</h3>
+			<ul><li>Its keyboard plays it: touch a key lower down for more pressure (the PRESSURE source of the matrix). In the MATRIX, click a point and drag it up or down; double-click clears it; click an ASSIGN name to change what it moves.</li></ul>
 			<h3>MIDI FX</h3>
 			<ul><li>ADD DEVICE › Modulation › MIDI FX: effects on the notes before they reach a synth. It goes between the keys and the last synth (Tab shows the MIDI cables: its MIDI OUT into the synth's MIDI IN). TIMING (to a grid, CHANCE), PITCH (TRANSPOSE, HARMONY, SCALE), ARP, ECHO (repeats, rising or falling with PITCH), VELOCITY.</li></ul>
 			<h3>Synth Editor</h3>
@@ -204,37 +206,39 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="analytics.js?v=20261022e"></script>
-<script src="webrack.js?v=20261022e"></script>
+<script src="analytics.js?v=20261022f"></script>
+<script src="webrack.js?v=20261022f"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261022e"></script>
-<script src="devices/dram.js?v=20261022e"></script>
-<script src="devices/b32.js?v=20261022e"></script>
-<script src="devices/maze.js?v=20261022e"></script>
-<script src="devices/mystic.js?v=20261022e"></script>
-<script src="devices/llmdram.js?v=20261022e"></script>
-<script src="devices/lunar.js?v=20261022e"></script>
-<script src="devices/mixer.js?v=20261022e"></script>
-<script src="devices/lfo.js?v=20261022e"></script>
-<script src="devices/comp.js?v=20261022e"></script>
-<script src="devices/reverb.js?v=20261022e"></script>
-<script src="devices/delay.js?v=20261022e"></script>
-<script src="devices/universe.js?v=20261022e"></script>
-<script src="devices/hyper.js?v=20261022e"></script>
-<script src="devices/tape.js?v=20261022e"></script>
-<script src="devices/cosmos.js?v=20261022e"></script>
-<script src="devices/pollyd.js?v=20261022e"></script>
-<script src="devices/grid.js?v=20261022e"></script>
-<script src="devices/mount.js?v=20261022e"></script>
-<script src="devices/reroute.js?v=20261022e"></script>
-<script src="devices/midifx-worklet.js?v=20261022e"></script>
-<script src="devices/midifx.js?v=20261022e"></script>
+<script src="devices/subharm.js?v=20261022f"></script>
+<script src="devices/dram.js?v=20261022f"></script>
+<script src="devices/b32.js?v=20261022f"></script>
+<script src="devices/maze.js?v=20261022f"></script>
+<script src="devices/mystic.js?v=20261022f"></script>
+<script src="devices/llmdram.js?v=20261022f"></script>
+<script src="devices/lunar.js?v=20261022f"></script>
+<script src="devices/mixer.js?v=20261022f"></script>
+<script src="devices/lfo.js?v=20261022f"></script>
+<script src="devices/comp.js?v=20261022f"></script>
+<script src="devices/reverb.js?v=20261022f"></script>
+<script src="devices/delay.js?v=20261022f"></script>
+<script src="devices/universe.js?v=20261022f"></script>
+<script src="devices/hyper.js?v=20261022f"></script>
+<script src="devices/tape.js?v=20261022f"></script>
+<script src="devices/cosmos.js?v=20261022f"></script>
+<script src="devices/pollyd.js?v=20261022f"></script>
+<script src="devices/grid.js?v=20261022f"></script>
+<script src="devices/mount.js?v=20261022f"></script>
+<script src="devices/reroute.js?v=20261022f"></script>
+<script src="devices/midifx-worklet.js?v=20261022f"></script>
+<script src="devices/midifx.js?v=20261022f"></script>
+<script src="devices/minimad-worklet.js?v=20261022f"></script>
+<script src="devices/minimad.js?v=20261022f"></script>
 <!-- the Synth Editor and its custom synths: kept apart from the devices above -->
-<script src="editor/custom-worklet.js?v=20261022e"></script>
-<script src="editor/custom.js?v=20261022e"></script>
-<script src="code.js?v=20261022e"></script>
-<script src="sequencer.js?v=20261022e"></script>
-<script src="sessions.js?v=20261022e"></script>
-<script src="editor/editor.js?v=20261022e"></script>
+<script src="editor/custom-worklet.js?v=20261022f"></script>
+<script src="editor/custom.js?v=20261022f"></script>
+<script src="code.js?v=20261022f"></script>
+<script src="sequencer.js?v=20261022f"></script>
+<script src="sessions.js?v=20261022f"></script>
+<script src="editor/editor.js?v=20261022f"></script>
 </body>
 </html>

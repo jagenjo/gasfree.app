@@ -40,6 +40,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
+| `app/devices/minimad.js`, `app/devices/minimad-worklet.js` | MiniMad, the digital paraphonic synthesizer with a touch keyboard (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `app/devices/midifx.js`, `app/devices/midifx-worklet.js` | MIDI FX, effects on the notes between the keys and the synths (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reverb.js`, `app/devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
@@ -205,6 +206,23 @@ A pattern sequencer on a 32 × 32 LED matrix, half a rack wide like the effects.
 - **Inputs:** CLOCK IN (a step a pulse), RESET, TRANSPOSE (1 V/oct) and RUN (plays while the gate is high). On the back, MIDI IN: it follows MIDI clock (start and stop too), and with **KBD** the keys transpose it (C4: as written).
 - **MIDI:** with it on (CH 1–16: click again for the next channel, Shift+click turns it off), the notes also go into the rack's MIDI on that channel, as the keys device's would. Every note of a step plays, so the polyphonic synths (MYSTIC, PARA D) play its chords.
 
+## MiniMad
+
+A small digital / analog hybrid with a flat touch keyboard: a digital oscillator with 14 types, an analog style filter, a cycling envelope, a modulation matrix, four voices paraphonic, an arpeggiator and a sequencer. White panel, orange marks.
+
+- **OSCILLATOR:** **TYPE** picks the engine; **WAVE**, **TIMBRE** and **SHAPE** do something different for each, named under the knobs and on the OLED:
+  - BASIC WAVES (wave: saw to square to triangle, symmetry, sub octave), SUPERWAVE (seven detuned waves: wave, detune, the side voices' volume), WAVETABLE (table BASIC / VOCAL / BELL / DIGITAL, position, chorus), HARMO (12 partials: content, odd / even sculpt, chorus), KARPLUS (a plucked string: bow, position, decay), V.ANALOG (two oscillators: wave, detune, hard sync), WAVESHAPER (sine to saw, folded: amount, asymmetry), TWO OP FM (ratio, amount, feedback), FORMANT (interval, formant, window shape), CHORDS (11 chord types, inversion, saw to square), MODAL (six struck resonators: harmonic to bell to plate, timbre, decay), NOISE (white to crackle, a band around the note, resonance), BASS (saturation, fold, sub), SAWX (two saws: detune, chaos, noise modulation).
+- **FILTER:** a 12 dB state variable filter, LPF, BPF or HPF (FILTER TYPE), CUTOFF and RESONANCE (up to self oscillation), a little drive into it.
+- **CYCLING ENVELOPE:** RISE, FALL, HOLD and AMOUNT. **MODE**: ENV (each note starts it, HOLD is the level it keeps while a key is held), RUN (each note starts it once, HOLD is a time at the top), LOOP (it cycles on its own: a second LFO).
+- **ENVELOPE:** ATTACK, DECAY / REL, SUSTAIN: each voice's VCA and the filter; **FILTER AMT** sends it to the cutoff, up or down from the middle.
+- **LFO:** RATE (0.05 to 50 Hz, or with **SYNC** a note of the tempo, 4 bars to 1/32), **SHAPE**: SINE, TRI, SAW, SQUARE, S&H, S&H GLIDE.
+- **MATRIX:** five sources (CYC ENV, ENVELOPE, LFO, PRESSURE, KEY/ARP: the note's pitch) by seven destinations (PITCH, WAVE, TIMBRE, CUTOFF and three **ASSIGN** columns). Click a point to select it, drag it up or down (orange up, blue down, bigger for more), double-click it to clear it, or turn **AMOUNT**. Click an ASSIGN column's name to send it to another knob: SHAPE, RESONANCE, LFO RATE, CYC RISE / FALL / HOLD / AMOUNT, ATTACK, DECAY, SUSTAIN, FILTER AMT, GLIDE, VOLUME or SPICE.
+- **PARA** on: four voices, each its own oscillator and VCA, through the one filter (paraphonic). Off: one voice, legato. **GLIDE** slides from note to note. **VOLUME**.
+- **Keyboard:** 25 flat keys that play the MiniMad itself. Touch a key lower down for more pressure, move on it to change it: that is the PRESSURE source of the matrix and the PRESSURE socket (MIDI notes start at none). Slide across the keys to play them one after another. **OCT − / +**: ±2 octaves.
+- **ARP / SEQ:** **ARP** plays the notes held one at a time, in **MODE** UP, ORDER, RAND or PATTERN (a rhythm and an order of its own, made again when the notes change). **SEQ** plays a sequence of up to 64 steps (four notes a step) with **PLAY** (or Space); the keys transpose it from its first note. **REC**, stopped: a new sequence, each chord played is a step and **REST** (the HOLD button) an empty one; playing, the notes go onto the steps. **HOLD** keeps the arpeggio going after the keys are let go. **RATE** (30 to 240 BPM, steps of a 16th), **SYNC** (the rack's tempo), **SWING**, MIDI clock and CLOCK IN (a step a pulse). **SPICE** / **DICE**: DICE rolls a random octave, gate length and rest for each step, SPICE is how many of the steps take them.
+- **CV:** CLOCK IN; CLOCK OUT (a pulse a step), PITCH (1 V/oct), GATE and PRESSURE (0 to 5 V) out. Stereo out on the back.
+- Factory patches: Init, Plucked Strings, Wavetable Pad, FM Bell Arp, Chord Sequence, Modal Mallets, Superwave Lead.
+
 ## Para D
 
 A classic analog synthesizer design with four oscillators, played as one voice or as four (its type in saved racks is `pollyd`). Its panel: black with white print, black knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
@@ -221,7 +239,7 @@ A classic analog synthesizer design with four oscillators, played as one voice o
 - **Output:** VOLUME, the stereo bucket brigade **CHORUS** (I, II, or both: fast and shallow) and a **DISTORTION** (DISTORTION, TONE, LEVEL).
 - **Deck:** the PITCH wheel (±2 semitones, springs back), the MOD wheel, the LFO (0.05–200 Hz, triangle or square) and TRANSPOSE (±1 octave).
 - **Sequencer:** 8 patterns of up to 32 steps. Each step holds a note or a chord (up to 4), an accent, a glide (tied into the next step) and a ratchet (1–4 repeats).
-  - **TEMPO**, GATE, SWING, and SYNC (follow the rack's tempo: its first device with a clock). It also follows MIDI clock (the song with SYNC on) or the SYNC IN socket (a step per pulse).
+  - **TEMPO**, GATE, SWING, and SYNC (follow the rack's tempo: its first device with a clock of its own, one not on SYNC). It also follows MIDI clock (the song with SYNC on) or the SYNC IN socket (a step per pulse).
   - **PLAY / STOP**, **HOLD** (stay on the step), **RESET** (back to step 1), **PAGE** (steps 1–8, 9–16, 17–24, 25–32, shown by the LOCATION lights).
   - **PATTERN**, then a step button, picks a pattern. **SHIFT + ARP (SET END)**, then a step button, sets its length. **SHIFT + a step** clears it. A step button alone moves the record position there and plays the step.
   - **REC**, stopped: each chord (or note) played is a step, and HOLD / REST adds a rest. RESET / ACCENT accents the last step recorded, and RATCHET sets its repeats. REC while playing: the notes go onto the nearest step.
