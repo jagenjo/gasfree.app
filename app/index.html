@@ -21,7 +21,7 @@
 <meta name="twitter:image" content="https://gasfree.app/img/share.jpg" />
 <link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
-<link href="editor/editor.css?v=20261022g" rel="stylesheet">
+<link href="editor/editor.css?v=20261022h" rel="stylesheet">
 <style>
 	* { margin: 0; padding: 0; box-sizing: border-box; }
 	html, body { height: 100%; background: #0b0b0b; color: #e8e4dc; overflow: hidden; }
@@ -89,8 +89,6 @@
 	#sessions-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: 460px; max-width: 92vw; padding: 10px 12px;
 		background: #1f1f1d; border: 1px solid #44443f; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
 	#sessions-panel .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8c8a84; }
-	#sessions-panel .reopen { display: flex; align-items: center; gap: 8px; margin: 8px 0; cursor: pointer; }
-	#sessions-panel .reopen input { accent-color: #c9483a; width: 15px; height: 15px; margin: 0; padding: 0; }
 	#sessions-panel .list { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 	#sessions-panel .item { display: flex; gap: 10px; align-items: center; padding: 7px 9px; background: #262624; border-radius: 4px; border-left: 3px solid #44443f; }
 	#sessions-panel .item.current { border-left-color: #c9483a; }
@@ -142,7 +140,7 @@
 	</div>
 	<button id="rear" title="Turn the rack around: the audio connections between the devices (Tab)">Rear (Tab)</button>
 	<div id="options-wrap">
-		<button id="options" title="Layout, wires and mouse wheel">Options &#9662;</button>
+		<button id="options" title="Layout, wires, mouse wheel, the last session at start, MIDI learn">Options &#9662;</button>
 		<div id="options-panel" hidden>
 			<div class="row">
 				<span class="label">Layout</span>
@@ -151,6 +149,7 @@
 			</div>
 			<label title="Hide the cables and keep only their plugs on the jacks"><input type="checkbox" id="opt-wires" /> Show wires</label>
 			<label title="Off: the mouse wheel always scrolls the rack, even over a knob or a fader (Ctrl + wheel still turns it)"><input type="checkbox" id="opt-wheel" /> Mouse wheel turns the knob under the cursor</label>
+			<label title="On: opening the site brings back the last session as you left it. Off: each visit starts a fresh rack in a new session (the old ones stay in Sessions)"><input type="checkbox" id="opt-reopen" /> Reopen the last session when the site opens</label>
 			<div class="row"><button id="opt-midilearn" title="Click a knob, fader or button, then move a MIDI controller or press a key / pad">MIDI learn</button></div>
 			<div id="opt-midimap"></div>
 		</div>
@@ -189,7 +188,7 @@
 			<ul><li><b>CPU</b> next to Audio on: how much of the real time the audio engine needs (twice a second). Amber over 60%, red over 85%; near 100% the sound breaks up. Removing heavy devices (polyphonic synths, reverbs, granular effects) lowers it.</li></ul>
 			<h3>Patches and sessions</h3>
 			<ul>
-				<li><b>Sessions</b> save themselves in this browser as you play. <b>Save as…</b> keeps a patch; <b>Export</b> downloads it (<b>Shift + Export</b>: copies it to the clipboard); <b>Import</b> loads one.</li>
+				<li><b>Sessions</b> save themselves in this browser as you play; the last one opens with the site (Options can turn that off). <b>Save as…</b> keeps a patch; <b>Export</b> downloads it (<b>Shift + Export</b>: copies it to the clipboard); <b>Import</b> loads one.</li>
 				<li><b>Randomize</b> gives every synth a random sound. <b>Add device</b> lists everything you can insert.</li>
 			</ul>
 			<h3>MINIMAD</h3>
@@ -206,39 +205,39 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="analytics.js?v=20261022g"></script>
-<script src="webrack.js?v=20261022g"></script>
+<script src="analytics.js?v=20261022h"></script>
+<script src="webrack.js?v=20261022h"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261022g"></script>
-<script src="devices/dram.js?v=20261022g"></script>
-<script src="devices/b32.js?v=20261022g"></script>
-<script src="devices/maze.js?v=20261022g"></script>
-<script src="devices/mystic.js?v=20261022g"></script>
-<script src="devices/llmdram.js?v=20261022g"></script>
-<script src="devices/lunar.js?v=20261022g"></script>
-<script src="devices/mixer.js?v=20261022g"></script>
-<script src="devices/lfo.js?v=20261022g"></script>
-<script src="devices/comp.js?v=20261022g"></script>
-<script src="devices/reverb.js?v=20261022g"></script>
-<script src="devices/delay.js?v=20261022g"></script>
-<script src="devices/universe.js?v=20261022g"></script>
-<script src="devices/hyper.js?v=20261022g"></script>
-<script src="devices/tape.js?v=20261022g"></script>
-<script src="devices/cosmos.js?v=20261022g"></script>
-<script src="devices/pollyd.js?v=20261022g"></script>
-<script src="devices/grid.js?v=20261022g"></script>
-<script src="devices/mount.js?v=20261022g"></script>
-<script src="devices/reroute.js?v=20261022g"></script>
-<script src="devices/midifx-worklet.js?v=20261022g"></script>
-<script src="devices/midifx.js?v=20261022g"></script>
-<script src="devices/minimad-worklet.js?v=20261022g"></script>
-<script src="devices/minimad.js?v=20261022g"></script>
+<script src="devices/subharm.js?v=20261022h"></script>
+<script src="devices/dram.js?v=20261022h"></script>
+<script src="devices/b32.js?v=20261022h"></script>
+<script src="devices/maze.js?v=20261022h"></script>
+<script src="devices/mystic.js?v=20261022h"></script>
+<script src="devices/llmdram.js?v=20261022h"></script>
+<script src="devices/lunar.js?v=20261022h"></script>
+<script src="devices/mixer.js?v=20261022h"></script>
+<script src="devices/lfo.js?v=20261022h"></script>
+<script src="devices/comp.js?v=20261022h"></script>
+<script src="devices/reverb.js?v=20261022h"></script>
+<script src="devices/delay.js?v=20261022h"></script>
+<script src="devices/universe.js?v=20261022h"></script>
+<script src="devices/hyper.js?v=20261022h"></script>
+<script src="devices/tape.js?v=20261022h"></script>
+<script src="devices/cosmos.js?v=20261022h"></script>
+<script src="devices/pollyd.js?v=20261022h"></script>
+<script src="devices/grid.js?v=20261022h"></script>
+<script src="devices/mount.js?v=20261022h"></script>
+<script src="devices/reroute.js?v=20261022h"></script>
+<script src="devices/midifx-worklet.js?v=20261022h"></script>
+<script src="devices/midifx.js?v=20261022h"></script>
+<script src="devices/minimad-worklet.js?v=20261022h"></script>
+<script src="devices/minimad.js?v=20261022h"></script>
 <!-- the Synth Editor and its custom synths: kept apart from the devices above -->
-<script src="editor/custom-worklet.js?v=20261022g"></script>
-<script src="editor/custom.js?v=20261022g"></script>
-<script src="code.js?v=20261022g"></script>
-<script src="sequencer.js?v=20261022g"></script>
-<script src="sessions.js?v=20261022g"></script>
-<script src="editor/editor.js?v=20261022g"></script>
+<script src="editor/custom-worklet.js?v=20261022h"></script>
+<script src="editor/custom.js?v=20261022h"></script>
+<script src="code.js?v=20261022h"></script>
+<script src="sequencer.js?v=20261022h"></script>
+<script src="sessions.js?v=20261022h"></script>
+<script src="editor/editor.js?v=20261022h"></script>
 </body>
 </html>

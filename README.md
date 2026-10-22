@@ -619,7 +619,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Sessions** (toolbar): your work is saved automatically in this browser, a few seconds after every change and when you leave the page.
   - A session is the whole rack (devices, settings, cables) and the song.
-  - Each visit reopens the last session; turn off *Reopen the last session at start* in the panel to start each visit with a fresh rack in a new session.
+  - Each visit reopens the last session; turn off *Reopen the last session when the site opens* in **Options** to start each visit with a fresh rack in a new session.
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.

@@ -1,7 +1,7 @@
 // sessions.js
 // Sessions: the whole rack (devices, settings, cables, song) saved automatically in this browser,
-// a few seconds after every change and when the page is left. Every visit is a new session (or,
-// with "Reopen the last session at start", continues the last one). The Sessions panel lists them,
+// a few seconds after every change and when the page is left. Every visit continues the last session
+// (Options: "Reopen the last session when the site opens"; off, each visit is a new one). The Sessions panel lists them,
 // newest first, to load, rename or delete. Patches (Save as...) are separate and unchanged.
 //   localStorage: SUBHARM_sessions = [{ id, name, created, updated, summary }], newest first
 //                 SUBHARM_session_<id> = the rack settings (JSON)
@@ -158,7 +158,19 @@ function setReopen( on )
 {
 	opts.reopen = on;
 	try { localStorage.setItem( OPTS_KEY, JSON.stringify( opts ) ); } catch(err) {}
+	var cb = document.getElementById( "opt-reopen" );
+	if(cb) cb.checked = on;
 }
+// its switch in the Options panel
+(function(){
+	var cb = document.getElementById( "opt-reopen" );
+	if(!cb) return;
+	cb.checked = opts.reopen;
+	cb.addEventListener("change", function(){
+		setReopen( cb.checked );
+		setStatus( cb.checked ? "The last session will open with the site" : "Each visit will start a fresh rack (the sessions stay in Sessions)" );
+	});
+})();
 
 // ---------------------------------------------------------------------------
 // the panel
@@ -182,7 +194,6 @@ function render()
 	var l = list();
 	var html = '<div class="row head"><span>Sessions are saved in this browser as you play.</span>' +
 		'<button data-act="new" title="Start a new session with a fresh rack (this one stays saved)">New session</button></div>' +
-		'<label class="reopen"><input type="checkbox" data-act="reopen"' + (opts.reopen ? " checked" : "") + ' /> Reopen the last session at start</label>' +
 		'<div class="list">';
 	if(!l.length)
 		html += '<div class="empty">No sessions yet.</div>';
@@ -230,8 +241,6 @@ panel.addEventListener("click", function(e){
 		newSession();
 		panel.hidden = true;
 	}
-	else if(act_ == "reopen")
-		setReopen( b.checked );
 });
 
 document.getElementById("sessions").addEventListener("click", function(e){
