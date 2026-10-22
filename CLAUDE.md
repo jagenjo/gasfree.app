@@ -3,7 +3,7 @@
 GASFREE (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a rack of synthesizers that runs in the browser. You add synths, drum machines, effects, mixers and sequencers to a rack and patch them with cables, as in hardware or in Reason. It is plain JavaScript with no build step and no dependencies.
 
 - Live at https://gasfree.app/ (the home page; the app is at /app/).
-- Repo: https://github.com/jagenjo/subharmsynth.js (the project started as a single synth, the Subharm).
+- Repo: https://github.com/jagenjo/gasfree.app (the project started as a single synth, the Subharm).
 - Author: tamat (javi.agenjo@gmail.com). The home page footer reads "by tamat 2026".
 
 `README.md` is the user manual and the file list: what every device and feature does. This file covers what the README doesn't: the goals, how the user likes to work, and how the code is put together.
@@ -87,7 +87,7 @@ The user writes short requests (often one or two lines, sometimes with typos) an
 
 - Commit each finished change and push. End commit messages with:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
-- Larger features go on a branch with a PR (e.g. `synth-editor`). `gh` is not installed: push the branch and give the user `https://github.com/jagenjo/subharmsynth.js/pull/new/<branch>`. PR descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- Larger features go on a branch with a PR (e.g. `synth-editor`). `gh` is not installed: push the branch and give the user `https://github.com/jagenjo/gasfree.app/pull/new/<branch>`. PR descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - Unrelated work goes on `main`, not on a feature branch. Check `git branch --show-current` first.
 - The user sometimes commits by hand (e.g. after a session ran out); look at `git log` and `git status` before starting.
 
