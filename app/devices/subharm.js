@@ -688,7 +688,10 @@ WR.registerSynth( "subharm", {
 	category: "Synths",
 	wood: true, // wooden sides
 	midi_in: "midi_in",
-	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
+	// line level, on the back; the STEP inputs are added to the step knobs of each sequencer
+	rear_jacks: [["AUDIO OUT", "aout", "audio"],
+		["SEQ 1 STEP 1", "ain", "seq1_s1"], ["SEQ 1 STEP 2", "ain", "seq1_s2"], ["SEQ 1 STEP 3", "ain", "seq1_s3"], ["SEQ 1 STEP 4", "ain", "seq1_s4"],
+		["SEQ 2 STEP 1", "ain", "seq2_s1"], ["SEQ 2 STEP 2", "ain", "seq2_s2"], ["SEQ 2 STEP 3", "ain", "seq2_s3"], ["SEQ 2 STEP 4", "ain", "seq2_s4"]],
 	audio_out: "audio",
 	defaults: defaults,
 	validate: validate,

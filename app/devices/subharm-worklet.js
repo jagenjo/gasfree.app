@@ -19,12 +19,12 @@ const C4 = 261.6255653005986;
 // must match the jack ids in devices/subharm.js
 // (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
 const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out","audio"];
-const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in"];
+const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in","seq1_s1","seq1_s2","seq1_s3","seq1_s4","seq2_s1","seq2_s2","seq2_s3","seq2_s4"];
 
 const O_VCO = [0, 3]; // +1 = sub 1, +2 = sub 2
 const O_VCA = 6, O_VCA_EG = 7, O_VCF_EG = 8, O_SEQ = [9, 11], O_SEQ_CLK = [10, 12], O_CLOCK = 13, O_TRIG = 14, O_AUDIO = 15;
 const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
-const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
+const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15, I_STEP = [16, 20]; // rear STEP inputs: line level, added to the step knobs
 const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
 
 const WAVE_SQUARE = 0, WAVE_PWM = 1, WAVE_SAW = 2;
@@ -243,7 +243,7 @@ class SubharmDSP {
 			else v.knob += (target - v.knob) * 0.25;
 			if (Math.abs(target - v.knob) < 1e-6) v.knob = target;
 
-			const seqCv = s.seq[i][this.step[i]] * s.seq_oct;
+			const seqCv = this.stepValue(i) * s.seq_oct;
 			const a = s.seq_assign[i];
 			let p = v.knob + (a.osc ? seqCv : 0) + this.midiPitch;
 			v.prePitch = p;
@@ -264,6 +264,13 @@ class SubharmDSP {
 			1 - Math.exp(-ATTACK_TC / (Math.max(attack, 0.0005) * sr)),
 			Math.exp(-DECAY_TC / (Math.max(decay, 0.001) * sr))
 		];
+	}
+
+	// the knob of the current step plus its rear input (line level, 1 = full knob)
+	stepValue(i) {
+		const k = this.step[i], j = I_STEP[i] + k;
+		const v = this.s.seq[i][k] + (this.patched[j] ? this.ins[j] : 0);
+		return v < -1 ? -1 : v > 1 ? 1 : v;
 	}
 
 	stepEg(eg, ac, dc, hold) {
@@ -468,8 +475,8 @@ class SubharmDSP {
 		outs[O_VCA] = vcaOut * 5;
 		outs[O_VCA_EG] = this.vcaEg.level * 5;
 		outs[O_VCF_EG] = this.vcfEg.level * 5;
-		outs[O_SEQ[0]] = s.seq[0][this.step[0]] * s.seq_oct;
-		outs[O_SEQ[1]] = s.seq[1][this.step[1]] * s.seq_oct;
+		outs[O_SEQ[0]] = this.stepValue(0) * s.seq_oct;
+		outs[O_SEQ[1]] = this.stepValue(1) * s.seq_oct;
 		for (let q = 0; q < PULSE_OUTS.length; q++) {
 			const idx = PULSE_OUTS[q];
 			if (pulses[idx] > 0) { outs[idx] = GATE_V; pulses[idx]--; }
