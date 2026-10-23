@@ -170,7 +170,7 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 
 ## Mount
 
-An eight voice polyphonic synthesizer with three oscillators a voice and wavetables. PATCH, LFO 1 and 2, GLIDE, ARP, the MENU with its OLED, ANIMATE and MASTER are along the top; the three OSCILLATOR rows, MIXER, FILTER, the envelope sliders and EFFECTS are below. The buttons light up red, and LED columns show the stepped choices.
+An eight voice polyphonic synthesizer with three oscillators a voice and wavetables. The panel is laid out as a classic desktop wavetable poly. MASTER and ANIMATE, PATCH, the MENU with its OLED, ARP, LFO 1 and 2, GLIDE, and the AMP and MOD ENVELOPE sliders are along the top. The three OSCILLATOR rows, MIXER, FILTER, DISTORTION, CHORUS, DELAY, EFFECTS (BYPASS) and REVERB are below. Every section has a blue line along its top. The white buttons light up orange, and orange LEDs show the stepped choices. CV MOD IN is on the strip at the top left.
 
 - **Patch:** the PATCH encoder and PATCH − / + step through 12 factory patches and 16 user slots. SAVE stores the sound in a user slot (the patch's own, or the first empty one). INITIALISE loads the init patch. COMPARE, held, plays the patch as saved. AUDITION plays middle C.
 - **Oscillators** (three alike):

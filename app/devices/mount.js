@@ -1,15 +1,17 @@
 // devices/mount.js
-// MOUNT module, an 8 voice polyphonic synthesizer (3 oscillators a voice). Its panel: PATCH, LFO 1 / 2, GLIDE, ARP, the MENU with its 4 x 20 OLED, ANIMATE and MASTER
-// on top; the three OSCILLATOR rows, MIXER, FILTER, AMP / MOD ENVELOPE sliders and EFFECTS below.
-// Dark grey panel, white print, rubber buttons lit red, LED columns for the stepped choices.
+// MOUNT module, an 8 voice polyphonic synthesizer (3 oscillators a voice). Its panel, as a classic
+// desktop wavetable poly: MASTER and ANIMATE, PATCH, the MENU with its OLED, ARP, LFO 1 / 2, GLIDE and the AMP /
+// MOD ENVELOPE sliders on top; the three OSCILLATOR rows, MIXER, FILTER, DISTORTION, CHORUS, DELAY,
+// EFFECTS and REVERB below. Black panel, a blue line over every section, white buttons, orange LEDs
+// beside the stepped choices.
 // The OLED shows the patch, or the control being turned; its nine menu buttons (PATCH, OSC, ENV, LFO,
 // ARP/CLOCK, MOD, VOICE, FX, SETTINGS) open pages of the deeper parameters: a row button and the
 // parameter encoder (or VALUE - / +) change them. DSP in mount-worklet.js.
 
 (function(){
 
-var SIZE = [1568, 720];
-var PANEL = "#2a2b2d", PANEL2 = "#232426", INK = "#f1f1ee", DIM = "#8e8f8c", LED = "#ff3b30", OLED = "#cfe9ff";
+var SIZE = [1568, 796];
+var PANEL = "#1d1e20", PANEL2 = "#0f1011", INK = "#f1f1ee", DIM = "#9a9b98", LED = "#ff6a1a", OLED = "#cfe9ff", BLUE = "#3aa6e0";
 var WAVES = ["sine", "tri", "saw", "pulse", "more"];
 var TABLES = ["BRIGHT", "VOCAL", "ORGAN", "ODD", "PULSE SWEEP", "DIGITAL", "HOLLOW", "SYNC"];
 var MOD_SRC = ["none", "lfo1", "lfo2", "env1", "env2", "amp", "vel", "wheel", "key", "cv", "anim1", "anim2"];
@@ -139,8 +141,14 @@ function randomize( s )
 function send( msg ) { var m = M; act(function(){ m.post( msg ); }); }
 function uiOf() { return uis[ M.id ] || (uis[ M.id ] = { menu: "patch", page: 0, row: 0, show: null, cmp: null, hold: false, anim: [false, false] }); }
 
+
 // ---------------------------------------------------------------------------
-// drawing helpers
+// drawing helpers. The layout is measured on a top view of the original, 1040 x 543 for the panel:
+// every position below is in those units, X() / Y() / K turn them into the panel's
+
+var K = 1524 / 1040;
+function X( x ) { return 22 + (x - 120) * K; }
+function Y( y ) { return (y - 372) * K; }
 
 function T( text, x, y, size, color, align, bold )
 {
@@ -162,66 +170,79 @@ function hot( id, x, y, w, h )
 	return { hover: hover, clicked: clicked || kb.pressed, held: (ui.active === full && ui.down) || kb.held };
 }
 
-// a section: its box and its name on the top edge
-function section( name, x, y, w, h )
+// a section (photo units): a blue line along its top edge, its name under it, and a blue arrow
+// on the right for the ones with a page in the menu
+function section( name, x0, y0, x1, y1, arrow )
 {
-	ctx.strokeStyle = "#4a4b4d"; ctx.lineWidth = 1;
-	ctx.beginPath(); ctx.roundRect( x + 0.5, y + 0.5, w, h, 4 ); ctx.stroke();
-	ctx.font = "bold 10px Arial, Helvetica, sans-serif";
-	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "1.5px";
-	var tw = ctx.measureText( name ).width + 12;
-	ctx.fillStyle = PANEL; ctx.fillRect( x + 10, y - 6, tw, 12 );
-	T( name, x + 16, y + 0.5, 10, INK, "left" );
-	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";
+	var x = X( x0 ) + 1.5, y = Y( y0 ) + 1.5, w = X( x1 ) - x - 1.5, h = Y( y1 ) - y - 1.5;
+	ctx.fillStyle = PANEL; ctx.fillRect( x, y, w, h );
+	ctx.fillStyle = BLUE; ctx.fillRect( x, y, w, 2.5 );
+	if(name) T( name, x + 5, y + 12, 10.5, INK, "left" );
+	if(arrow) { ctx.fillStyle = BLUE; ctx.beginPath(); ctx.moveTo( x + w - 12, y + 6 ); ctx.lineTo( x + w - 4, y + 10.5 ); ctx.lineTo( x + w - 12, y + 15 ); ctx.closePath(); ctx.fill(); }
 }
 
-// a rubber button that lights up
-function pbtn( id, x, y, w, h, label, lit, tooltip, small )
+// a white rubber button (photo units: its centre); lit: orange. Its name goes under it
+function pbtn( id, px, py, label, lit, tooltip, o )
 {
+	o = o || {};
+	var w = (o.w || 26) * K, h = (o.h || 12) * K, x = X( px ) - w / 2, y = Y( py ) - h / 2;
 	var r = hot( id, x, y, w, h );
-	ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.beginPath(); ctx.roundRect( x + 1, y + 2, w, h, 3 ); ctx.fill();
+	ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.beginPath(); ctx.roundRect( x + 1, y + 2, w, h, 2.5 ); ctx.fill();
 	var g = ctx.createLinearGradient( 0, y, 0, y + h );
-	if(lit) { g.addColorStop( 0, "#ff6a5a" ); g.addColorStop( 1, "#d8261c" ); }
-	else { g.addColorStop( 0, r.hover ? "#55575a" : "#48494c" ); g.addColorStop( 1, r.hover ? "#3d3e41" : "#333437" ); }
-	ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect( x, y + (r.held ? 1 : 0), w, h, 3 ); ctx.fill();
-	if(lit) { ctx.fillStyle = "rgba(255,70,50,0.18)"; ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill(); }
-	if(label) label.split( "\n" ).forEach(function(l, i, a){ T( l, x + w / 2, y + h / 2 + (r.held ? 1 : 0) + (i - (a.length - 1) / 2) * 9, small || 8, lit ? "#fff" : "#d9d9d6" ); });
-	if(r.hover && tooltip) tip( tooltip, x + w / 2, y + h + 14 );
+	if(lit) { g.addColorStop( 0, "#ffb36a" ); g.addColorStop( 1, "#ff7414" ); }
+	else { g.addColorStop( 0, r.hover ? "#ffffff" : "#ecece8" ); g.addColorStop( 1, r.hover ? "#d6d6d2" : "#c4c4bf" ); }
+	ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect( x, y + (r.held ? 1 : 0), w, h, 2.5 ); ctx.fill();
+	if(lit) { ctx.fillStyle = "rgba(255,120,30,0.22)"; ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill(); }
+	if(o.inside) T( o.inside, x + w / 2, y + h / 2 + (r.held ? 1 : 0), o.size || 10, "#1a1a1a" );
+	if(label) label.split( "\n" ).forEach(function(l, i){ T( l, x + w / 2, y + h + 9 + i * 10, 8 ); });
+	if(r.hover && tooltip) tip( tooltip, x + w / 2, y + h + (label ? 26 : 14) );
 	return r;
 }
 
 function led( x, y, on, color )
 {
-	ctx.fillStyle = on ? (color || LED) : "#3a1d1b";
-	ctx.beginPath(); ctx.arc( x, y, 3, 0, Math.PI * 2 ); ctx.fill();
-	if(on) { ctx.fillStyle = "rgba(255,60,40,0.25)"; ctx.beginPath(); ctx.arc( x, y, 6, 0, Math.PI * 2 ); ctx.fill(); }
+	ctx.fillStyle = on ? (color || LED) : "#3a2418";
+	ctx.beginPath(); ctx.roundRect( x - 4, y - 2, 8, 4, 2 ); ctx.fill();
+	if(on) { ctx.fillStyle = "rgba(255,110,30,0.28)"; ctx.beginPath(); ctx.arc( x, y, 6.5, 0, Math.PI * 2 ); ctx.fill(); }
 }
 
-// a button stepping through choices, with an LED column naming them (dim: 0.35 on)
-function choice( id, x, y, label, names, index, title, levels )
+// a stepped choice: a button stepping through it and an LED with each name (photo units:
+// the button's centre, and the LEDs' places). dim: lit at half, for the levels in use
+function choice( id, bx, by, label, names, index, title, at, levels )
 {
-	var r = pbtn( id, x, y, 38, 18, "", false, title + ": " + names[ index ] );
-	T( label, x + 19, y - 9, 8 );
+	var r = pbtn( id, bx, by, label, false, title + ": " + names[ index ] );
 	names.forEach(function(n, i){
-		var ly = y + 4 + i * 11 - (names.length > 4 ? 4 : 0);
-		var on = i == index, dim = levels && levels[i];
-		ctx.globalAlpha = on ? 1 : (dim ? 0.55 : 1);
-		led( x + 46, ly, on || dim );
+		var p = at( i ), on = i == index, dim = levels && levels[i];
+		ctx.globalAlpha = on ? 1 : (dim ? 0.5 : 1);
+		led( X( p[0] ), Y( p[1] ), on || dim );
 		ctx.globalAlpha = 1;
-		T( n, x + 53, ly + 0.5, 7, on ? INK : DIM, "left" );
+		T( n, X( p[0] ) + 8, Y( p[1] ) + 0.5, 7.5, on ? INK : DIM, "left" );
 	});
 	return r.clicked ? (index + 1) % names.length : index;
 }
+function column( x, y ) { return function(i){ return [ x, y + i * 11 ]; }; }
 
-// a knob: its value shown on the OLED while it is turned
-function pk( id, cx, cy, r, value, min, max, label, o )
+// a knob (photo units), its name under it; its value shows on the OLED while it is turned
+function pk( id, px, py, pr, value, min, max, label, o )
 {
 	o = o || {};
-	o.label = label; o.labelSize = 8; o.style = "small";
+	o.style = "small";
+	var cx = X( px ), cy = Y( py ), r = pr * K;
 	var v = knob( id, cx, cy, r, value, min, max, o );
+	label.split( "\n" ).forEach(function(l, i){ T( l, cx, cy + r + 11 + i * 10, 8 ); });
 	var full = id_prefix + id;
 	if(ui.active === full || (ui.hot === full && v !== value)) showValue( label.replace( "\n", " " ), o.format ? o.format( v ) : v.toFixed( 2 ) );
 	return v;
+}
+
+// a bracket under two controls, with its name (photo units)
+function bracket( x0, x1, y, name )
+{
+	ctx.strokeStyle = INK; ctx.lineWidth = 1;
+	ctx.beginPath(); ctx.moveTo( X( x0 ), Y( y ) - 3 ); ctx.lineTo( X( x0 ), Y( y ) ); ctx.lineTo( X( x1 ), Y( y ) ); ctx.lineTo( X( x1 ), Y( y ) - 3 ); ctx.stroke();
+	var tw = name.length * 5 + 10;
+	ctx.fillStyle = PANEL; ctx.fillRect( (X( x0 ) + X( x1 )) / 2 - tw / 2, Y( y ) - 2, tw, 4 );
+	T( name, (X( x0 ) + X( x1 )) / 2, Y( y ) + 0.5, 7.5 );
 }
 
 function showValue( name, value ) { var u = uiOf(); u.show = [ name, value, performance.now() + 1200 ]; }
@@ -231,26 +252,42 @@ var bip = function(v){ return (v > 0 ? "+" : "") + Math.round( v * 63 ); };
 var tm = function(v){ return v < 1 ? Math.round( v * 1000 ) + " MS" : v.toFixed( 2 ) + " S"; };
 
 // ---------------------------------------------------------------------------
-// top: PATCH, LFO 1 / 2, GLIDE, ARP, MENU, ANIMATE, MASTER
+// top: MASTER, ANIMATE, PATCH, MENU, ARP, LFO 1 / 2, GLIDE, the envelopes
+
+function drawMaster()
+{
+	section( "MASTER", 120, 397, 190, 493 );
+	S.volume = pk( "volume", 155, 440, 16, S.volume, 0, 1, "VOLUME", { def: 0.75, format: pct } );
+}
+
+function drawAnimate()
+{
+	var u = uiOf();
+	section( "ANIMATE", 120, 495, 190, 612 );
+	for(var i = 0; i < 2; ++i)
+	{
+		var r = pbtn( "anim" + i, 155, 528 + i * 38, "", u.anim[i], "ANIMATE " + (i + 1) + ": " + MOD_DST_N[ MOD_DST.indexOf( S.mod[4 + i].dst ) ] + " (SETTINGS MENU)", { w: 22, h: 24, inside: String( i + 1 ), size: 13 } );
+		var on = r.held || (u.hold && u.anim[i]);
+		if(r.clicked && u.hold && u.anim[i]) { u.hold = false; on = false; }
+		if(on != u.anim[i]) { u.anim[i] = on; send({ type: "anim", n: i, on: on }); }
+	}
+	if(pbtn( "anim_hold", 155, 600, "", u.hold, "HOLD: ANIMATE STAYS ON", { w: 22, h: 8, inside: "HOLD", size: 7 } ).clicked) u.hold = !u.hold;
+}
 
 function drawPatch()
 {
 	var u = uiOf();
-	section( "PATCH", 30, 22, 214, 216 );
-	if(pbtn( "init", 42, 42, 58, 22, "INITIALISE", false, "INITIALISE: THE INIT PATCH" ).clicked) { loadPatch( S, 0 ); showValue( "PATCH", "INIT PATCH" ); }
-	var c = pbtn( "compare", 108, 42, 58, 22, "COMPARE", !!u.cmp, "HOLD: THE PATCH AS SAVED" );
+	section( "PATCH", 192, 397, 280, 612 );
+	if(pbtn( "init", 214, 427, "INITIALISE", false, "INITIALISE: THE INIT PATCH" ).clicked) { loadPatch( S, 0 ); showValue( "PATCH", "INIT PATCH" ); }
+	var c = pbtn( "compare", 257, 427, "COMPARE", !!u.cmp, "HOLD: THE PATCH AS SAVED" );
 	if(c.held && !u.cmp) { u.cmp = sound( S ); var p = S.patch; loadPatch( S, p ); }
 	else if(!c.held && u.cmp) { var keep = u.cmp; u.cmp = null; Object.keys( keep ).forEach(function(k){ S[k] = keep[k]; }); }
-	var a = pbtn( "audition", 174, 42, 58, 22, "AUDITION", false, "PLAYS MIDDLE C" );
+	var a = pbtn( "audition", 214, 457, "AUDITION", false, "PLAYS MIDDLE C" );
 	if(a.clicked) send({ type: "note", note: 60, on: true, vel: 0.8 });
 	if(u.aud && !a.held) send({ type: "note", note: 60, on: false });
 	u.aud = a.held;
-	// the PATCH encoder over the factory patches and the 16 user slots
 	var n = patchCount( S );
-	var v = knob( "patch_sel", 98, 150, 34, S.patch, 0, n - 1, { step: 1, style: "small", ticks: 2, format: function(i){ return String( i ).padStart( 3, "0" ) + " " + patchName( S, i ); } } );
-	if(v != S.patch) { loadPatch( S, v ); showValue( "PATCH", String( v ).padStart( 3, "0" ) + " " + S.name ); }
-	T( "PATCH", 98, 104, 8 );
-	if(pbtn( "save", 172, 112, 58, 22, "SAVE", false, "SAVE INTO A USER SLOT (" + (PATCHES.length) + "-" + (PATCHES.length + 15) + ")" ).clicked)
+	if(pbtn( "save", 257, 457, "SAVE", false, "SAVE INTO A USER SLOT (" + (PATCHES.length) + "-" + (PATCHES.length + 15) + ")" ).clicked)
 	{
 		var slot = S.patch >= PATCHES.length ? S.patch - PATCHES.length : S.user.findIndex(function(x){ return !x; });
 		if(slot < 0) slot = S.user.length < 16 ? S.user.length : 15;
@@ -259,36 +296,12 @@ function drawPatch()
 		S.patch = PATCHES.length + slot; S.name = name;
 		showValue( "SAVED", String( S.patch ).padStart( 3, "0" ) + " " + name );
 	}
-	if(pbtn( "patch_dn", 172, 150, 27, 22, "-", false, "PREVIOUS PATCH" ).clicked) { loadPatch( S, (S.patch + n - 1) % n ); showValue( "PATCH", S.name ); }
-	if(pbtn( "patch_up", 203, 150, 27, 22, "+", false, "NEXT PATCH" ).clicked) { loadPatch( S, (S.patch + 1) % n ); showValue( "PATCH", S.name ); }
-	T( "PATCH - / +", 201, 182, 7, DIM );
-}
-
-function drawLfo( i, x )
-{
-	var p = S.lfo[i], types = ["tri", "saw", "square", "sh"];
-	section( "LFO " + (i + 1), x, 22, 188, 216 );
-	p.type = types[ choice( "lfo" + i + "_type", x + 12, 52, "TYPE", ["TRIANGLE", "SAW", "SQUARE", "S & H"], types.indexOf( p.type ), "LFO " + (i + 1) + " TYPE" ) ];
-	led( x + 172, 40, ST.lfo && ST.lfo[i] > 0.3 );
-	var ranges = ["high", "low", "sync"];
-	p.range = ranges[ choice( "lfo" + i + "_range", x + 106, 52, "RANGE", ["HIGH", "LOW", "SYNC"], ranges.indexOf( p.range ), "LFO " + (i + 1) + " RANGE" ) ];
-	p.fade = pk( "lfo" + i + "_fade", x + 46, 180, 18, p.fade, 0, 1, "FADE TIME", { def: 0, format: function(v){ return v < 0.01 ? "OFF" : (v * 10).toFixed( 1 ) + " S"; } } );
-	p.rate = pk( "lfo" + i + "_rate", x + 136, 172, 26, p.rate, 0, 1, "RATE", { def: 0.4, format: function(v){
-		if(p.range == "sync") return SYNC_N[ Math.round( v * (SYNC_DIV_N - 1) ) ];
-		var hz = p.range == "low" ? 0.01 * Math.pow( 300, v ) : 0.3 * Math.pow( 200, v );
-		return hz < 10 ? hz.toFixed( 2 ) + " HZ" : Math.round( hz ) + " HZ";
-	} } );
-}
-
-function drawGlideArp()
-{
-	section( "GLIDE", 634, 22, 84, 216 );
-	S.glide.time = pk( "glide_time", 676, 100, 22, S.glide.time, 0.002, 4, "TIME", { exp: true, def: 0.1, format: tm } );
-	if(pbtn( "glide_on", 652, 168, 48, 24, "ON", S.glide.on, "GLIDE ON / OFF" ).clicked) S.glide.on = !S.glide.on;
-	section( "ARP", 726, 22, 100, 216 );
-	if(pbtn( "arp_on", 740, 48, 72, 24, "ON", S.arp.on, "ARPEGGIATOR (MORE IN THE ARP/CLOCK MENU)" ).clicked) { S.arp.on = !S.arp.on; send({ type: "allNotesOff" }); }
-	if(pbtn( "arp_latch", 740, 84, 72, 24, "KEY LATCH", S.arp.latch, "KEY LATCH: THE NOTES PLAY ON AFTER THE KEYS ARE LET GO" ).clicked) S.arp.latch = !S.arp.latch;
-	S.arp.gate = pk( "arp_gate", 776, 180, 22, S.arp.gate, 0.05, 1, "GATE", { def: 0.5, format: pct } );
+	// the PATCH encoder over the factory patches and the 16 user slots
+	var v = knob( "patch_sel", X( 235 ), Y( 525 ), 16 * K, S.patch, 0, n - 1, { step: 1, style: "small", ticks: 2, format: function(i){ return String( i ).padStart( 3, "0" ) + " " + patchName( S, i ); } } );
+	if(v != S.patch) { loadPatch( S, v ); showValue( "PATCH", String( v ).padStart( 3, "0" ) + " " + S.name ); }
+	if(pbtn( "patch_dn", 214, 582, "", false, "PREVIOUS PATCH" ).clicked) { loadPatch( S, (S.patch + n - 1) % n ); showValue( "PATCH", S.name ); }
+	if(pbtn( "patch_up", 257, 582, "", false, "NEXT PATCH" ).clicked) { loadPatch( S, (S.patch + 1) % n ); showValue( "PATCH", S.name ); }
+	T( "-", X( 214 ), Y( 600 ), 10 ); T( "PATCH", X( 235.5 ), Y( 600 ), 8 ); T( "+", X( 257 ), Y( 600 ), 10 );
 }
 
 // the MENU: the OLED, the nine menu buttons, rows, pages, the parameter encoder
@@ -353,10 +366,10 @@ function drawMenu()
 	var u = uiOf(), pages = rowDefs();
 	u.page = Math.min( u.page, pages.length - 1 );
 	var page = pages[ u.page ];
-	section( "MENU", 834, 22, 482, 216 );
+	section( "MENU", 282, 397, 593, 612 );
 	// the OLED
-	var ox = 906, oy = 38, ow = 300, oh = 92;
-	ctx.fillStyle = "#050607"; ctx.beginPath(); ctx.roundRect( ox - 8, oy - 6, ow + 16, oh + 12, 4 ); ctx.fill();
+	var ox = X( 338 ), oy = Y( 498 ), ow = X( 516 ) - ox, oh = Y( 558 ) - oy;
+	ctx.fillStyle = "#050607"; ctx.beginPath(); ctx.roundRect( ox - 6, oy - 4, ow + 12, oh + 8, 3 ); ctx.fill();
 	var lines;
 	if(u.show && performance.now() < u.show[2]) lines = [ u.show[0], "", u.show[1], "" ];
 	else
@@ -368,171 +381,200 @@ function drawMenu()
 			lines = [ page.title + (pages.length > 1 ? "  " + (u.page + 1) + "/" + pages.length : "") ].concat( page.rows.map(function(r, i){
 				var v = r.fmt( r.get() ); return (u.row == i ? "▸" : " ") + r.name + " " + v; }) );
 	}
-	ctx.font = "bold 15px 'Courier New', Courier, monospace";
+	ctx.font = "bold 14px 'Courier New', Courier, monospace";
 	ctx.textAlign = "left"; ctx.textBaseline = "middle";
 	lines.forEach(function(l, i){
-		l = String( l ).toUpperCase().substr( 0, 26 );
+		l = String( l ).toUpperCase().substr( 0, 28 );
 		ctx.fillStyle = i == 0 ? "#ffffff" : OLED;
-		ctx.fillText( l, ox + 4, oy + 12 + i * 22 );
-		if(i == 0) { ctx.fillStyle = "rgba(207,233,255,0.25)"; ctx.fillRect( ox + 2, oy + 23, ow - 4, 1 ); }
+		ctx.fillText( l, ox + 4, oy + 10 + i * (oh - 8) / 4 );
 	});
 	// the row buttons, left of the rows 2-4
 	for(var i = 0; i < 3; ++i)
-		if(pbtn( "row" + i, 850, oy + 26 + i * 22, 34, 16, "", u.row == i && !(u.menu == "patch"), "ROW " + (i + 2) + ": THE PARAMETER ENCODER CHANGES IT" ).clicked) { u.row = i; u.show = null; }
-	// the parameter encoder, VALUE - / +
+		if(pbtn( "row" + i, 306, 507 + i * 26, "", u.row == i && u.menu != "patch", "ROW " + (i + 2) + ": THE ENCODER CHANGES IT", { w: 24, h: 12 } ).clicked) { u.row = i; u.show = null; }
+	// the value encoder, VALUE - / +
 	var row = page.rows[ u.row ], cur = row.get();
-	var nv = knob( "param", 1264, 70, 24, cur, row.min, Math.max( row.max, row.min + 1 ), { step: row.step, style: "small", ticks: 2, format: function(v){ return row.name + " " + row.fmt( v ); } } );
-	T( "PARAMETER", 1264, 34, 8 );
-	if(pbtn( "val_dn", 1232, 106, 30, 20, "-", false, "VALUE -" ).clicked) nv = Math.max( row.min, cur - 1 );
-	if(pbtn( "val_up", 1268, 106, 30, 20, "+", false, "VALUE +" ).clicked) nv = Math.min( row.max, cur + 1 );
-	T( "VALUE", 1265, 134, 7, DIM );
+	var nv = knob( "param", X( 550 ), Y( 522 ), 17 * K, cur, row.min, Math.max( row.max, row.min + 1 ), { step: row.step, style: "small", ticks: 2, format: function(v){ return row.name + " " + row.fmt( v ); } } );
+	if(pbtn( "val_dn", 528, 582, "", false, "VALUE -" ).clicked) nv = Math.max( row.min, cur - 1 );
+	if(pbtn( "val_up", 571, 582, "", false, "VALUE +" ).clicked) nv = Math.min( row.max, cur + 1 );
+	T( "-", X( 528 ), Y( 600 ), 10 ); T( "VALUE", X( 549.5 ), Y( 600 ), 8 ); T( "+", X( 571 ), Y( 600 ), 10 );
 	if(nv != cur && row.max > row.min) { row.set( nv ); u.browsing = u.menu == "patch"; }
-	// the nine menus
-	var menus = [["patch", "PATCH"], ["osc", "OSC"], ["env", "ENV"], ["lfo", "LFO"], ["arp", "ARP\nCLOCK"], ["mod", "MOD"], ["voice", "VOICE"], ["fx", "FX"], ["settings", "SETTINGS"]];
+	// PATCH (lit orange) and the eight menus, two rows of four
+	var menus = [["osc", "OSC"], ["env", "ENV"], ["lfo", "LFO"], ["arp", "ARP/CLOCK"], ["mod", "MOD"], ["voice", "VOICE"], ["fx", "FX"], ["settings", "SETTINGS"]];
+	var pick = function(m){
+		if(u.menu == m) { u.page = (u.page + 1) % rowDefs().length; }
+		else { u.menu = m; u.page = 0; u.row = m == "patch" ? 0 : u.row; }
+		u.browsing = m != "patch"; u.show = null;
+	};
+	if(pbtn( "menu_patch", 298, 443, "PATCH", u.menu == "patch", "PATCH MENU", { w: 20, h: 14 } ).clicked) pick( "patch" );
 	menus.forEach(function(m, i){
-		if(pbtn( "menu_" + m[0], 848 + i * 51, 158, 46, 24, m[1], u.menu == m[0], m[1].replace( "\n", "/" ) + " MENU", 7 ).clicked)
-		{
-			if(u.menu == m[0]) { u.page = (u.page + 1) % rowDefs().length; }
-			else { u.menu = m[0]; u.page = 0; u.row = m[0] == "patch" ? 0 : u.row; }
-			u.browsing = m[0] != "patch"; u.show = null;
-		}
+		if(pbtn( "menu_" + m[0], 362 + (i % 4) * 42, 427 + Math.floor( i / 4 ) * 30, m[1], u.menu == m[0], m[1] + " MENU", { w: 30 } ).clicked) pick( m[0] );
 	});
-	if(pbtn( "page_dn", 1210, 196, 40, 20, "◀", false, "PAGE" ).clicked) u.page = (u.page + pages.length - 1) % pages.length;
-	if(pbtn( "page_up", 1260, 196, 40, 20, "▶", false, "PAGE" ).clicked) u.page = (u.page + 1) % pages.length;
-	T( "PAGE / SELECT", 1255, 224, 7, DIM );
-	// ACTIVE VOICE LEDs
-	T( "ACTIVE VOICE", 850, 206, 7, DIM, "left" );
-	for(var k = 0; k < 8; ++k) led( 926 + k * 14, 206, ST.voices && ST.voices[k] );
-}
-
-function drawAnimate()
-{
-	var u = uiOf();
-	section( "ANIMATE", 1324, 22, 122, 216 );
-	for(var i = 0; i < 2; ++i)
+	if(pbtn( "page_dn", 404, 582, "", false, "PAGE" ).clicked) u.page = (u.page + pages.length - 1) % pages.length;
+	if(pbtn( "page_up", 446, 582, "", false, "PAGE" ).clicked) u.page = (u.page + 1) % pages.length;
+	T( "◀  PAGE / SELECT  ▶", X( 425 ), Y( 600 ), 8 );
+	// ACTIVE VOICES: 2 rows of 4 LEDs
+	for(var k = 0; k < 8; ++k)
 	{
-		var r = pbtn( "anim" + i, 1338 + i * 54, 50, 44, 44, String( i + 1 ), u.anim[i], "ANIMATE " + (i + 1) + ": " + MOD_DST_N[ MOD_DST.indexOf( S.mod[4 + i].dst ) ] + " (SETTINGS MENU)", 14 );
-		var on = r.held || (u.hold && u.anim[i]);
-		if(r.clicked && u.hold && u.anim[i]) { u.hold = false; on = false; }
-		if(on != u.anim[i]) { u.anim[i] = on; send({ type: "anim", n: i, on: on }); }
+		var lx = X( 527 + (k % 4) * 16 ), ly = Y( k < 4 ? 437 : 448 );
+		T( String( k + 1 ), lx, ly + (k < 4 ? -9 : 9), 7, DIM );
+		led( lx, ly, ST.voices && ST.voices[k] );
 	}
-	if(pbtn( "anim_hold", 1358, 120, 62, 24, "HOLD", u.hold, "HOLD: ANIMATE STAYS ON" ).clicked) u.hold = !u.hold;
+	T( "ACTIVE VOICES", X( 551 ), Y( 467 ), 8 );
 }
 
-function drawMaster()
+function drawArp()
 {
-	section( "MASTER", 1454, 22, 88, 216 );
-	S.volume = pk( "volume", 1498, 100, 26, S.volume, 0, 1, "VOLUME", { def: 0.75, format: pct } );
-	var full = id_prefix + "cv_in", cx = 1498, cy = 196;
-	jacks[ full ] = { x: rackX( cx ), y: rackY( cy ), type: "in", label: "CV MOD IN" };
-	var hover = hitCircle( cx, cy, 12 );
-	if(cable_drag && cable_drag.from != full && jackCompatible( cable_drag, jacks[ full ] )) { ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.3)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc( cx, cy, 13, 0, Math.PI * 2 ); ctx.stroke(); }
-	ctx.fillStyle = "#a9aaa6"; ctx.beginPath(); ctx.arc( cx, cy, 9, 0, Math.PI * 2 ); ctx.fill();
-	ctx.fillStyle = hover && !cable_drag ? "#333" : "#060606"; ctx.beginPath(); ctx.arc( cx, cy, 5.5, 0, Math.PI * 2 ); ctx.fill();
-	T( "CV MOD IN", cx, cy - 18, 7 );
-	if(hover && !cable_drag) tip( "CV MOD IN (±5 V): A SOURCE OF THE MOD MATRIX", cx, cy + 22 );
+	section( "ARP", 595, 397, 652, 612 );
+	S.arp.gate = pk( "arp_gate", 623, 440, 15, S.arp.gate, 0.05, 1, "GATE", { def: 0.5, format: pct } );
+	if(pbtn( "arp_latch", 623, 527, "KEY LATCH", S.arp.latch, "KEY LATCH: THE NOTES PLAY ON AFTER THE KEYS ARE LET GO" ).clicked) S.arp.latch = !S.arp.latch;
+	if(pbtn( "arp_on", 623, 582, "ON", S.arp.on, "ARPEGGIATOR (MORE IN THE ARP/CLOCK MENU)" ).clicked) { S.arp.on = !S.arp.on; send({ type: "allNotesOff" }); }
+}
+
+function drawLfo( i )
+{
+	var p = S.lfo[i], types = ["tri", "saw", "square", "sh"], d = i * 254;
+	section( "LFO " + (i + 1), 654 + d, 397, 906 + d, 493 );
+	p.type = types[ choice( "lfo" + i + "_type", 700 + d, 472, "TYPE", ["TRI", "SAW", "SQUARE", "S+H"], types.indexOf( p.type ), "LFO " + (i + 1) + " TYPE", column( 690 + d, 422 ) ) ];
+	var ranges = ["low", "high", "sync"];
+	p.range = ranges[ choice( "lfo" + i + "_range", 815 + d, 472, "RANGE", ["LOW", "HIGH", "SYNC"], ranges.indexOf( p.range ), "LFO " + (i + 1) + " RANGE", column( 802 + d, 433 ) ) ];
+	p.fade = pk( "lfo" + i + "_fade", 759 + d, 440, 16, p.fade, 0, 1, "FADE TIME", { def: 0, format: function(v){ return v < 0.01 ? "OFF" : (v * 10).toFixed( 1 ) + " S"; } } );
+	p.rate = pk( "lfo" + i + "_rate", 871 + d, 440, 17, p.rate, 0, 1, "RATE", { def: 0.4, format: function(v){
+		if(p.range == "sync") return SYNC_N[ Math.round( v * (SYNC_DIV_N - 1) ) ];
+		var hz = p.range == "low" ? 0.01 * Math.pow( 300, v ) : 0.3 * Math.pow( 200, v );
+		return hz < 10 ? hz.toFixed( 2 ) + " HZ" : Math.round( hz ) + " HZ";
+	} } );
+	led( X( 730 + d ), Y( 408 ), ST.lfo && ST.lfo[i] > 0.3 ); // the LFO's beat
+}
+
+function drawGlide()
+{
+	section( "GLIDE", 654, 495, 722, 612 );
+	S.glide.time = pk( "glide_time", 688, 535, 15, S.glide.time, 0.002, 4, "TIME", { exp: true, def: 0.1, format: tm } );
+	if(pbtn( "glide_on", 688, 582, "ON", S.glide.on, "GLIDE ON / OFF" ).clicked) S.glide.on = !S.glide.on;
+}
+
+// the sliders of an envelope (photo units: the columns, the top of the slots)
+var ENV_NAMES = ["ATTACK", "DECAY", "SUSTAIN", "RELEASE"], ENV_KEYS = ["a", "d", "s", "r"];
+function envToN( k, v ) { return k == "s" ? v : Math.log( v / 0.001 ) / Math.log( 20 / 0.001 ); }
+function envFromN( k, n ) { return k == "s" ? n : 0.001 * Math.pow( 20 / 0.001, n ); }
+function faders( env, prefix, cols )
+{
+	ENV_KEYS.forEach(function(k, i){
+		var x = X( cols[i] ), y = Y( 516 ), len = Y( 590 ) - y;
+		// the scale beside the slot
+		ctx.fillStyle = "#6d6e6c";
+		for(var s = 0; s <= 10; ++s) ctx.fillRect( x - 17, y + len * s / 10, 6, 1 );
+		var n0 = envToN( k, env[k] ), n = fader( prefix + k, x, y, len, n0, { def: k == "s" ? 0.7 : 0.4 } );
+		if(n != n0) { env[k] = envFromN( k, n ); showValue( prefix.replace( "_", " " ).toUpperCase() + ENV_NAMES[i], k == "s" ? pct( env[k] ) : tm( env[k] ) ); }
+		T( ENV_NAMES[i], x, Y( 605 ), 7.5 );
+	});
+}
+
+function drawEnvelopes()
+{
+	section( "AMP ENVELOPE", 724, 495, 906, 612 );
+	faders( S.amp, "amp_", [745, 792, 837, 882] );
+	section( "MOD ENVELOPES", 908, 495, 1160, 612 );
+	S.env_sel = choice( "env_sel", 940, 582, "SELECT", ["1", "2"], S.env_sel - 1, "SELECT: THE MOD ENVELOPE THE SLIDERS SET", column( 930, 552 ) ) + 1;
+	faders( S.env_sel == 1 ? S.env1 : S.env2, "env" + S.env_sel + "_", [988, 1033, 1078, 1123] );
 }
 
 // ---------------------------------------------------------------------------
-// bottom: the OSCILLATORS, MIXER, FILTER, ENVELOPES, EFFECTS
+// bottom: the OSCILLATOR rows, MIXER, FILTER, the effects
 
 function drawOscillators()
 {
-	section( "OSCILLATORS", 30, 256, 760, 446 );
-	var srcs = ["env1", "lfo1", "manual"];
+	var srcs = ["manual", "env1", "lfo1"];
 	S.osc.forEach(function(o, k){
-		var y = 286 + k * 142, n = k + 1;
-		T( "OSC", 50, y + 46, 8, DIM ); T( String( n ), 50, y + 62, 18 );
-		if(k) { ctx.fillStyle = "#3c3d40"; ctx.fillRect( 40, y - 10, 740, 1 ); }
-		o.range = choice( "osc" + n + "_range", 76, y + 22, "RANGE", ["16'", "8'", "4'", "2'"], o.range, "OSC " + n + " RANGE" );
-		o.coarse = pk( "osc" + n + "_coarse", 200, y + 58, 22, o.coarse, -12, 12, "COARSE", { def: 0, step: 0.01, bipolar: true, format: function(v){ return (v > 0 ? "+" : "") + v.toFixed( 2 ) + " SEMI"; } } );
-		o.fine = pk( "osc" + n + "_fine", 274, y + 58, 22, o.fine, -100, 100, "FINE", { def: 0, bipolar: true, format: function(v){ return (v > 0 ? "+" : "") + Math.round( v ) + " CENTS"; } } );
-		var wi = choice( "osc" + n + "_wave", 330, y + 14, "WAVE", ["SINE", "TRIANGLE", "SAWTOOTH", "PULSE", "MORE"], WAVES.indexOf( o.wave ), "OSC " + n + " WAVE" );
+		var d = k * 88, n = k + 1;
+		section( "OSCILLATOR " + n, 120, 615 + d, 593, 701 + d, true );
+		var ranges = ["16'", "8'", "4'", "2'"];
+		o.range = choice( "osc" + n + "_range", 157, 675 + d, "RANGE", ranges, o.range, "OSC " + n + " RANGE", function(i){ return [ 143 + (i >> 1) * 24, 645 + (i & 1) * 11 + d ]; } );
+		o.coarse = pk( "osc" + n + "_coarse", 210, 652 + d, 16, o.coarse, -12, 12, "COARSE", { def: 0, step: 0.01, ticks: 25, bipolar: true, format: function(v){ return (v > 0 ? "+" : "") + v.toFixed( 2 ) + " SEMI"; } } );
+		o.fine = pk( "osc" + n + "_fine", 270, 652 + d, 16, o.fine, -100, 100, "FINE", { def: 0, bipolar: true, format: function(v){ return (v > 0 ? "+" : "") + Math.round( v ) + " CENTS"; } } );
+		var wi = choice( "osc" + n + "_wave", 327, 675 + d, "WAVE", ["SINE", "TRI", "SAW", "PULSE", "MORE"], WAVES.indexOf( o.wave ), "OSC " + n + " WAVE",
+			function(i){ return i < 3 ? [ 297, 634 + i * 11 + d ] : [ 329, 634 + (i - 3) * 11 + d ]; } );
 		if(WAVES[wi] != o.wave) { o.wave = WAVES[wi]; showValue( "OSC " + n + " WAVE", o.wave == "more" ? "TABLE " + TABLES[ o.table ] : o.wave.toUpperCase() ); }
-		T( "MOD ENV 2", 494, y + 16, 8 ); T( "LFO 2", 568, y + 16, 8 );
-		o.env2 = pk( "osc" + n + "_env2", 494, y + 58, 19, o.env2, -1, 1, "DEPTH", { def: 0, bipolar: true, format: bip } );
-		o.lfo2 = pk( "osc" + n + "_lfo2", 568, y + 58, 19, o.lfo2, -1, 1, "DEPTH", { def: 0, bipolar: true, format: bip } );
+		o.env2 = pk( "osc" + n + "_env2", 378, 652 + d, 16, o.env2, -1, 1, "MOD ENV 2 DEPTH", { def: 0, bipolar: true, format: bip } );
+		o.lfo2 = pk( "osc" + n + "_lfo2", 443, 652 + d, 16, o.lfo2, -1, 1, "LFO 2 DEPTH", { def: 0, bipolar: true, format: bip } );
+		bracket( 362, 459, 692 + d, "PITCH" );
 		var si = srcs.indexOf( o.src );
-		var nsi = choice( "osc" + n + "_src", 614, y + 22, "SOURCE", ["MOD ENV 1", "LFO 1", "MANUAL"], si, "OSC " + n + " SHAPE SOURCE (THE KNOB EDITS IT)", [ Math.abs( o.shape.env1 ) > 0.01, Math.abs( o.shape.lfo1 ) > 0.01, true ] );
+		var nsi = choice( "osc" + n + "_src", 557, 675 + d, "", ["MANUAL", "MOD ENV 1", "LFO 1"], si, "OSC " + n + " SHAPE SOURCE (THE KNOB EDITS IT)", column( 543, 634 + d ),
+			[ true, Math.abs( o.shape.env1 ) > 0.01, Math.abs( o.shape.lfo1 ) > 0.01 ] );
 		o.src = srcs[ nsi ];
 		var man = o.src == "manual";
-		o.shape[ o.src ] = pk( "osc" + n + "_shape", 740, y + 58, 22, o.shape[ o.src ], man ? 0 : -1, 1, "SHAPE\nAMOUNT", { def: man ? 0.5 : 0, bipolar: !man,
+		o.shape[ o.src ] = pk( "osc" + n + "_shape", 503, 652 + d, 16, o.shape[ o.src ], man ? 0 : -1, 1, "SHAPE AMOUNT", { def: man ? 0.5 : 0, bipolar: !man,
 			format: function(v){ return (man ? (o.wave == "pulse" ? "WIDTH " : "SHAPE ") + Math.round( v * 100 ) + "%" : (o.src == "env1" ? "MOD ENV 1 " : "LFO 1 ") + bip( v )); } } );
+		bracket( 488, 572, 692 + d, "SOURCE" );
 	});
 }
 
 function drawMixer()
 {
-	section( "MIXER", 800, 256, 104, 446 );
-	var m = S.mix, rows = [["osc1", "OSC 1"], ["osc2", "OSC 2"], ["osc3", "OSC 3"], ["ring", "RING 1*2"], ["noise", "NOISE"], ["vca", "VCA GAIN"]];
-	rows.forEach(function(r, i){
-		m[ r[0] ] = pk( "mix_" + r[0], 852, 304 + i * 70, 18, m[ r[0] ], 0, 1, r[1], { def: r[0] == "osc1" || r[0] == "vca" ? 0.8 : 0, format: pct } );
+	section( "MIXER", 595, 615, 652, 888 );
+	section( "", 654, 615, 722, 701 );
+	section( "", 654, 703, 722, 888 );
+	ctx.fillStyle = BLUE; ctx.beginPath(); ctx.moveTo( X( 712 ), Y( 619 ) ); ctx.lineTo( X( 718 ), Y( 622 ) ); ctx.lineTo( X( 712 ), Y( 625 ) ); ctx.fill();
+	var m = S.mix, knobs = [["osc1", "OSC 1", 625, 652], ["vca", "VCA GAIN", 686, 652], ["osc2", "OSC 2", 625, 740], ["ring", "RING 1+2", 686, 740], ["osc3", "OSC 3", 625, 827], ["noise", "NOISE", 686, 827]];
+	knobs.forEach(function(r){
+		m[ r[0] ] = pk( "mix_" + r[0], r[2], r[3], 16, m[ r[0] ], 0, 1, r[1], { def: r[0] == "osc1" || r[0] == "vca" ? 0.8 : 0, format: pct } );
 	});
 }
 
 function drawFilter()
 {
 	var f = S.filter;
-	section( "FILTER", 914, 256, 254, 446 );
-	var sh = ["lp", "bp", "hp"];
-	f.shape = sh[ choice( "flt_shape", 928, 290, "SHAPE", ["LP", "BP", "HP"], sh.indexOf( f.shape ), "FILTER SHAPE" ) ];
-	f.slope = choice( "flt_slope", 1012, 290, "SLOPE", ["12 dB", "24 dB"], f.slope == 24 ? 1 : 0, "FILTER SLOPE" ) ? 24 : 12;
-	f.track = pk( "flt_track", 1124, 312, 17, f.track, 0, 1, "KEY\nTRACKING", { def: 0.5, format: pct } );
-	f.freq = pk( "flt_freq", 1040, 428, 44, f.freq, 0, 1, "FREQUENCY", { def: 0.75, format: function(v){ var hz = 20 * Math.pow( 1000, v ); return hz < 1000 ? Math.round( hz ) + " HZ" : (hz / 1000).toFixed( 2 ) + " KHZ"; } } );
-	f.res = pk( "flt_res", 950, 432, 18, f.res, 0, 1, "RESONANCE", { def: 0.1, format: pct } );
-	f.drive = pk( "flt_drive", 1130, 432, 18, f.drive, 0, 1, "OVERDRIVE", { def: 0, format: pct } );
+	section( "FILTER", 724, 615, 906, 888, true );
+	f.lfo1 = pk( "flt_lfo1", 752, 652, 16, f.lfo1, -1, 1, "LFO 1 DEPTH", { def: 0, bipolar: true, format: bip } );
+	f.osc3 = pk( "flt_osc3", 815, 652, 16, f.osc3, 0, 1, "OSC 3 FILTER MOD", { def: 0, format: pct } );
+	f.track = pk( "flt_track", 876, 652, 16, f.track, 0, 1, "KEY TRACKING", { def: 0.5, format: pct } );
+	f.env = pk( "flt_env", 752, 740, 16, f.env, -1, 1, "ENV DEPTH", { def: 0, bipolar: true, format: bip } );
+	f.res = pk( "flt_res", 815, 740, 16, f.res, 0, 1, "RESONANCE", { def: 0.1, format: pct } );
+	f.drive = pk( "flt_drive", 876, 740, 16, f.drive, 0, 1, "OVERDRIVE", { def: 0, format: pct } );
+	f.freq = pk( "flt_freq", 815, 830, 26, f.freq, 0, 1, "FREQUENCY", { def: 0.75, format: function(v){ var hz = 20 * Math.pow( 1000, v ); return hz < 1000 ? Math.round( hz ) + " HZ" : (hz / 1000).toFixed( 2 ) + " KHZ"; } } );
+	// SOURCE: MOD ENV 1, AMP ENV or both (both LEDs lit)
 	var src = f.src_env1 && f.src_amp ? 2 : (f.src_amp ? 1 : 0);
-	var ns = choice( "flt_src", 928, 552, "SOURCE", ["MOD ENV 1", "AMP ENV", "BOTH"], src, "THE ENVELOPE(S) MOVING THE FREQUENCY" );
-	f.src_env1 = ns != 1; f.src_amp = ns != 0;
-	f.env = pk( "flt_env", 1060, 580, 19, f.env, -1, 1, "ENV\nDEPTH", { def: 0, bipolar: true, format: bip } );
-	f.lfo1 = pk( "flt_lfo1", 1130, 580, 19, f.lfo1, -1, 1, "LFO 1\nDEPTH", { def: 0, bipolar: true, format: bip } );
-	f.osc3 = pk( "flt_osc3", 1060, 668, 15, f.osc3, 0, 1, "OSC 3 FILTER MOD", { def: 0, format: pct } );
-}
-
-function drawEnvelopes()
-{
-	var u = uiOf();
-	section( "AMP ENVELOPE", 1178, 256, 200, 210 );
-	var names = ["ATTACK", "DECAY", "SUSTAIN", "RELEASE"], keys = ["a", "d", "s", "r"];
-	var toN = function(k, v){ return k == "s" ? v : Math.log( v / 0.001 ) / Math.log( 20 / 0.001 ); };
-	var fromN = function(k, n){ return k == "s" ? n : 0.001 * Math.pow( 20 / 0.001, n ); };
-	var faders = function(env, prefix, y){
-		keys.forEach(function(k, i){
-			var x = 1210 + i * 46, n0 = toN( k, env[k] ), n = fader( prefix + k, x, y, 130, n0, { def: k == "s" ? 0.7 : 0.4 } );
-			if(n != n0) { env[k] = fromN( k, n ); showValue( prefix.replace( "_", " " ).toUpperCase() + names[i], k == "s" ? pct( env[k] ) : tm( env[k] ) ); }
-			T( names[i], x, y + 152, 7 );
-		});
-	};
-	faders( S.amp, "amp_", 290 );
-	section( "MOD ENVELOPES", 1178, 476, 200, 226 );
-	S.env_sel = choice( "env_sel", 1192, 492, "", ["MOD 1", "MOD 2"], S.env_sel - 1, "SELECT: THE MOD ENVELOPE THE SLIDERS SET" ) + 1;
-	T( "SELECT", 1300, 498, 8 );
-	faders( S.env_sel == 1 ? S.env1 : S.env2, "env" + S.env_sel + "_", 530 );
+	var r = pbtn( "flt_src", 755, 812, "SOURCE", false, "THE ENVELOPE(S) MOVING THE FREQUENCY: " + ["MOD ENV 1", "AMP ENV", "BOTH"][ src ] );
+	if(r.clicked) { src = (src + 1) % 3; f.src_env1 = src != 1; f.src_amp = src != 0; }
+	[["AMP ENV", f.src_amp], ["MOD ENV 1", f.src_env1]].forEach(function(e, i){ led( X( 742 ), Y( 782 + i * 11 ), e[1] ); T( e[0], X( 742 ) + 8, Y( 782 + i * 11 ) + 0.5, 7.5, e[1] ? INK : DIM, "left" ); });
+	f.slope = choice( "flt_slope", 755, 866, "SLOPE", ["12 dB", "24 dB"], f.slope == 24 ? 1 : 0, "FILTER SLOPE", column( 742, 836 ) ) ? 24 : 12;
+	var sh = ["lp", "bp", "hp"];
+	f.shape = sh[ choice( "flt_shape", 876, 866, "SHAPE", ["LP", "BP", "HP"], sh.indexOf( f.shape ), "FILTER SHAPE", column( 862, 826 ) ) ];
 }
 
 function drawEffects()
 {
 	var fx = S.fx;
-	section( "EFFECTS", 1388, 256, 154, 446 );
-	T( "DISTORTION", 1418, 274, 8 );
-	fx.dist = pk( "fx_dist", 1418, 322, 16, fx.dist, 0, 1, "LEVEL", { def: 0, format: pct } );
-	if(pbtn( "fx_bypass", 1468, 296, 60, 22, "BYPASS", fx.bypass, "BYPASS: NO CHORUS, DELAY OR REVERB" ).clicked) fx.bypass = !fx.bypass;
-	var row = function(name, y){ ctx.fillStyle = "#3c3d40"; ctx.fillRect( 1396, y - 12, 138, 1 ); T( name, 1400, y, 9, INK, "left" ); };
-	row( "DELAY", 360 );
-	if(pbtn( "dly_sync", 1488, 352, 44, 16, "SYNC", fx.delay.sync, "DELAY TIME IN NOTES OF THE ARP TEMPO", 7 ).clicked) fx.delay.sync = !fx.delay.sync;
-	fx.delay.time = pk( "dly_time", 1414, 410, 15, fx.delay.time, 0, 1, "TIME", { def: 0.3, format: function(v){ return fx.delay.sync ? SYNC_N[ 11 + Math.round( v * 7 ) ] : Math.round( (0.01 + v * 1.39) * 1000 ) + " MS"; } } );
-	fx.delay.fb = pk( "dly_fb", 1464, 410, 15, fx.delay.fb, 0, 0.95, "FEEDBACK", { def: 0.3, format: pct } );
-	fx.delay.level = pk( "dly_level", 1514, 410, 15, fx.delay.level, 0, 1, "LEVEL", { def: 0, format: pct } );
-	row( "REVERB", 458 );
-	fx.reverb.time = pk( "rev_time", 1414, 508, 15, fx.reverb.time, 0, 1, "TIME", { def: 0.5, format: pct } );
-	if(pbtn( "rev_type", 1449, 498, 30, 20, String( fx.reverb.type + 1 ), false, "REVERB TYPE " + (fx.reverb.type + 1) + " (3: THE LARGEST)", 10 ).clicked) fx.reverb.type = (fx.reverb.type + 1) % 3;
-	T( "TYPE", 1464, 486, 8 );
-	fx.reverb.level = pk( "rev_level", 1514, 508, 15, fx.reverb.level, 0, 1, "LEVEL", { def: 0, format: pct } );
-	row( "CHORUS", 570 );
-	fx.chorus.rate = pk( "cho_rate", 1414, 620, 15, fx.chorus.rate, 0, 1, "RATE", { def: 0.3, format: pct } );
-	if(pbtn( "cho_type", 1449, 610, 30, 20, String( fx.chorus.type + 1 ), false, "CHORUS TYPE " + (fx.chorus.type + 1), 10 ).clicked) fx.chorus.type = (fx.chorus.type + 1) % 3;
-	T( "TYPE", 1464, 598, 8 );
-	fx.chorus.level = pk( "cho_level", 1514, 620, 15, fx.chorus.level, 0, 1, "LEVEL", { def: 0, format: pct } );
+	section( "DISTORTION", 908, 615, 970, 701 );
+	fx.dist = pk( "fx_dist", 940, 652, 16, fx.dist, 0, 1, "LEVEL", { def: 0, format: pct } );
+	section( "CHORUS", 972, 615, 1160, 701, true );
+	fx.chorus.rate = pk( "cho_rate", 1009, 652, 16, fx.chorus.rate, 0, 1, "RATE", { def: 0.3, format: pct } );
+	fx.chorus.type = choice( "cho_type", 1065, 675, "TYPE", ["1", "2", "3"], fx.chorus.type, "CHORUS TYPE", column( 1052, 634 ) );
+	fx.chorus.level = pk( "cho_level", 1122, 652, 16, fx.chorus.level, 0, 1, "LEVEL", { def: 0, format: pct } );
+	section( "DELAY", 908, 703, 1160, 789, true );
+	fx.delay.fb = pk( "dly_fb", 940, 740, 16, fx.delay.fb, 0, 0.95, "FEEDBACK", { def: 0.3, format: pct } );
+	fx.delay.time = pk( "dly_time", 1009, 740, 16, fx.delay.time, 0, 1, "TIME", { def: 0.3, format: function(v){ return fx.delay.sync ? SYNC_N[ 11 + Math.round( v * 7 ) ] : Math.round( (0.01 + v * 1.39) * 1000 ) + " MS"; } } );
+	if(pbtn( "dly_sync", 1059, 742, "SYNC", fx.delay.sync, "DELAY TIME IN NOTES OF THE ARP TEMPO", { w: 18 } ).clicked) fx.delay.sync = !fx.delay.sync;
+	fx.delay.level = pk( "dly_level", 1122, 740, 16, fx.delay.level, 0, 1, "LEVEL", { def: 0, format: pct } );
+	section( "EFFECTS", 908, 791, 970, 888 );
+	if(pbtn( "fx_bypass", 940, 828, "BYPASS", fx.bypass, "BYPASS: NO CHORUS, DELAY OR REVERB" ).clicked) fx.bypass = !fx.bypass;
+	section( "REVERB", 972, 791, 1160, 888, true );
+	fx.reverb.time = pk( "rev_time", 1009, 828, 16, fx.reverb.time, 0, 1, "TIME", { def: 0.5, format: pct } );
+	fx.reverb.type = choice( "rev_type", 1065, 851, "TYPE", ["1", "2", "3"], fx.reverb.type, "REVERB TYPE (3: THE LARGEST)", column( 1052, 810 ) );
+	fx.reverb.level = pk( "rev_level", 1122, 828, 16, fx.reverb.level, 0, 1, "LEVEL", { def: 0, format: pct } );
+}
+
+// the CV MOD IN socket, on the strip above the sections
+function drawCvIn()
+{
+	var full = id_prefix + "cv_in", cx = X( 132 ), cy = Y( 384.5 );
+	jacks[ full ] = { x: rackX( cx ), y: rackY( cy ), type: "in", label: "CV MOD IN" };
+	var hover = hitCircle( cx, cy, 12 );
+	if(cable_drag && cable_drag.from != full && jackCompatible( cable_drag, jacks[ full ] )) { ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.3)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc( cx, cy, 13, 0, Math.PI * 2 ); ctx.stroke(); }
+	ctx.fillStyle = "#a9aaa6"; ctx.beginPath(); ctx.arc( cx, cy, 9, 0, Math.PI * 2 ); ctx.fill();
+	ctx.fillStyle = hover && !cable_drag ? "#333" : "#060606"; ctx.beginPath(); ctx.arc( cx, cy, 5.5, 0, Math.PI * 2 ); ctx.fill();
+	T( "CV MOD IN", cx + 16, cy + 0.5, 8, INK, "left" );
+	if(hover && !cable_drag) tip( "CV MOD IN (±5 V): A SOURCE OF THE MOD MATRIX", cx, cy + 22 );
 }
 
 // ---------------------------------------------------------------------------
@@ -543,27 +585,28 @@ function draw( mod )
 	ST = M.state = M.state || { voices: [], lfo: [0, 0] };
 	var w = SIZE[0], h = SIZE[1];
 	drawCasing( 0, 0, w, h );
-	var g = ctx.createLinearGradient( 0, 0, 0, h );
-	g.addColorStop( 0, "#2e2f31" ); g.addColorStop( 1, "#262729" );
-	ctx.fillStyle = g; ctx.fillRect( 22, 0, w - 44, h );
-	// the name, on the front edge
-	ctx.font = "bold 13px Arial, Helvetica, sans-serif";
-	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "6px";
+	ctx.fillStyle = PANEL2; ctx.fillRect( 22, 0, w - 44, h );
+	// the name, top right, and the strip along the front edge
+	ctx.font = "bold italic 26px Arial, Helvetica, sans-serif";
+	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "3px";
 	ctx.fillStyle = INK; ctx.textAlign = "right"; ctx.textBaseline = "middle";
-	ctx.fillText( "MOUNT", w - 30, h - 9 );
+	ctx.fillText( "MOUNT", X( 1158 ), Y( 384.5 ) + 1 );
 	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";
-	T( "8 VOICE POLYPHONIC SYNTHESIZER", w - 130, h - 9, 8, DIM, "right", false );
-	drawPatch();
-	drawLfo( 0, 254 );
-	drawLfo( 1, 444 );
-	drawGlideArp();
-	drawMenu();
-	drawAnimate();
+	T( "WAVETABLE OSCILLATORS", X( 124 ), Y( 902 ), 10.5, INK, "left" );
+	T( "EIGHT-VOICE POLYPHONIC SYNTHESIZER", X( 1158 ), Y( 902 ), 10.5, INK, "right" );
+	drawCvIn();
 	drawMaster();
+	drawAnimate();
+	drawPatch();
+	drawMenu();
+	drawArp();
+	drawLfo( 0 );
+	drawLfo( 1 );
+	drawGlide();
+	drawEnvelopes();
 	drawOscillators();
 	drawMixer();
 	drawFilter();
-	drawEnvelopes();
 	drawEffects();
 	M = null; S = null; ST = null;
 }
