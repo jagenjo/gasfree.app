@@ -564,7 +564,7 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
 - **Tracks** (up to 16), on the left: each plays on its own MIDI **CH**annel (click to change, Shift for the previous), with **M**ute and **S**olo. Double-click a name to rename it in place (Enter keeps it, Escape cancels).
   - **⋮ (options):** COPY the track, PASTE the copy below it, DELETE it, MOVE UP or MOVE DOWN.
   - **+ TRACK** adds one on the next free channel; **CLEAR** empties the selected track.
-  - **LOAD MIDI FILE** replaces the song with a standard MIDI file (.mid). Every channel of every track becomes a track (up to 16), on its channel; the first tempo sets the BPM, and the loop gets as many bars as the notes need (up to 64).
+  - **MIDI FILE** opens a menu: OPEN A FILE... (the file picker) or one of the files of the library (`app/data/midis`, listed in `app/data/midis/index.json`; run `tools/make-midi-list.py` after adding or removing files). A .mid file dropped on the page (or on the detached sequencer window) loads too. It replaces the song with a standard MIDI file (.mid), after asking if the song has notes. Every channel of every track becomes a track (up to 16), on its channel; the first tempo sets the BPM, and the loop gets as many bars as the notes need. Songs are limited to 64 bars: what comes after is left out.
   - Set the synths' **CH** switches on the back (Tab) to choose which synth plays which track. A synth on OMNI plays them all.
 - **Piano roll** of the selected track, with the other tracks' notes faint behind it.
   - Click empty space to add a note, as long as the grid. Drag a note's end to change its length (the cursor changes over the end).

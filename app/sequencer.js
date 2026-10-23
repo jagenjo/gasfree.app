@@ -513,8 +513,10 @@ function drawTracks( y0, h )
 		var t = track(), n = isCv( t ) ? t.points.length : t.notes.length;
 		if(n && W().confirm( "Clear the " + n + (isCv( t ) ? " points" : " notes") + " of " + t.name + "?" )) { t.notes = []; if(isCv( t )) t.points = []; view.sel = []; reschedule(); }
 	}, "Remove the notes (or CV points) of the selected track" );
-	btn( 166, by, 76, 20, "MIDI FILE", false, function(){ midiFileInput().click(); },
-		"Load a standard MIDI file (.mid): its tracks replace the song's" );
+	btn( 166, by, 76, 20, "MIDI FILE", !!(view.menu && view.menu.lib), function(){
+		view.menu = view.menu && view.menu.lib ? null : { lib: true, x: 8, y: by + 22 };
+		if(view.menu) loadMidiList();
+	}, "Load a standard MIDI file (.mid): one from the library or your own. Dropping a .mid file on the page does the same. Its tracks replace the song's" );
 }
 
 // the track options menu, drawn over everything (a click elsewhere closes it)
@@ -522,8 +524,8 @@ function drawMenu( H )
 {
 	var m = view.menu, s = song();
 	if(!m) return;
-	if(m.i >= s.tracks.length) { view.menu = null; return; }
-	var items = [
+	if(!m.lib && m.i >= s.tracks.length) { view.menu = null; return; }
+	var items = m.lib ? libraryItems() : [
 		[ "COPY", true, function(){ view.clip = JSON.parse( JSON.stringify( s.tracks[ m.i ] ) ); } ],
 		[ "PASTE", !!view.clip && s.tracks.length < 16, function(){
 			var t = JSON.parse( JSON.stringify( view.clip ) );
@@ -543,16 +545,48 @@ function drawMenu( H )
 		[ "MOVE UP", m.i > 0, function(){ moveTrack( m.i, -1 ); } ],
 		[ "MOVE DOWN", m.i < s.tracks.length - 1, function(){ moveTrack( m.i, 1 ); } ]
 	];
-	var w = 110, ih = 24, mh = items.length * ih + 6, x = m.x, y = m.y + mh > H ? Math.max( BAR_H, m.y - 24 - mh ) : m.y;
+	var w = m.lib ? 400 : 110, ih = 24, mh = items.length * ih + 6, x = m.x, y = m.y + mh > H ? Math.max( BAR_H, m.y - 24 - mh ) : m.y;
 	g.fillStyle = "#262624"; g.strokeStyle = "#55554f"; g.lineWidth = 1;
 	g.beginPath(); g.roundRect( x, y, w, mh, 5 ); g.fill(); g.stroke();
 	ui.buttons.push({ x: x, y: y, w: w, h: mh, menu: true, fn: function(){} }); // its gaps: no click through
 	items.forEach(function(it, k){
 		var iy = y + 3 + k * ih, hover = it[1] && view.px >= x && view.px <= x + w && view.py >= iy && view.py < iy + ih;
 		if(hover) rect( x + 3, iy, w - 6, ih, "#3d3d39" );
-		text( it[0], x + 12, iy + ih * 0.5, 12, it[1] ? (it[0] == "DELETE" ? "#f08070" : "#e8e4dc") : "#5d5b56" );
+		text( it[0], x + 12, iy + ih * 0.5, 12, it[1] ? (it[3] ? "#9a988f" : it[0] == "DELETE" ? "#f08070" : "#e8e4dc") : "#5d5b56" );
 		ui.buttons.push({ x: x, y: iy, w: w, h: ih, menu: true, fn: function(){ if(!it[1]) return; view.menu = null; it[2](); } });
 	});
+}
+
+// the MIDI library: data/midis/index.json lists the files ([{ file, name }], made by tools/make-midi-list.py)
+var midi_list = null; // null: not asked yet, "loading", "error", or the list
+function loadMidiList()
+{
+	if(midi_list) return;
+	midi_list = "loading";
+	fetch( "data/midis/index.json" ).then(function(r){ if(!r.ok) throw new Error( r.status ); return r.json(); })
+		.then(function(list){ midi_list = Array.isArray( list ) ? list.filter(function(e){ return e && e.file; }) : "error"; })
+		.catch(function(){ midi_list = "error"; });
+}
+
+function libraryItems()
+{
+	var items = [[ "OPEN A FILE...", true, function(){ midiFileInput().click(); } ]];
+	if(midi_list == "loading") items.push([ "LOADING THE LIST...", false, null ]);
+	else if(midi_list == "error") items.push([ "THE LIBRARY IS NOT AVAILABLE", false, null ]);
+	else if(!midi_list.length) items.push([ "THE LIBRARY IS EMPTY", false, null ]);
+	else
+	{
+		items.push([ "LIBRARY", false, null, true ]);
+		midi_list.forEach(function(e){
+			items.push([ (e.name || e.file.replace( /\.midi?$/i, "" )).toUpperCase().substr( 0, 48 ), true, function(){
+				fetch( "data/midis/" + encodeURIComponent( e.file ).replace( /%2F/g, "/" ) ).then(function(r){ if(!r.ok) throw new Error( "not found" ); return r.arrayBuffer(); })
+					.then(function(buf){ openMidi( buf, e.name || e.file ); })
+					.catch(function(err){ W().alert( "Could not load " + e.file + ": " + err.message ); });
+			} ]);
+		});
+	}
+	items.push([ "OR DROP A .MID FILE ON THE PAGE", false, null, true ]);
+	return items;
 }
 
 function moveTrack( i, d )
@@ -625,7 +659,7 @@ function parseMidi( buf )
 				if(type == 0x2F) break;
 				continue;
 			}
-			if(st == 0xF0 || st == 0xF7) { p += vlq(); continue; }
+			if(st == 0xF0 || st == 0xF7) { var sl = vlq(); p += sl; continue; } // (p += vlq() would add to the p from before the length)
 			if(!(st & 0x80)) break; // corrupt: data without a status
 			run = st;
 			var cmd = st & 0xF0, ch = st & 0x0F, a = d[p++], b = cmd == 0xC0 || cmd == 0xD0 ? 0 : d[p++];
@@ -668,6 +702,41 @@ function loadMidiFile( buf )
 	return rack.settings.song;
 }
 
+// a MIDI file (from the picker, the library or dropped): asks before replacing a song with notes
+function openMidi( buf, name )
+{
+	var notes = song().tracks.reduce(function(a, t){ return a + t.notes.length; }, 0);
+	if(notes && !W().confirm( "Replace the song (" + notes + " notes) with " + name + "?" ))
+		return;
+	try
+	{
+		var sg = loadMidiFile( buf );
+		if(!view.open) { view.open = true; fitView(); save(); } // shows the song
+		if(window.gfTrack) gfTrack( "midi-file", { tracks: sg.tracks.length } );
+		if(window.setStatus) setStatus( name + ": " + sg.tracks.length + " tracks, " + sg.bars + " bars at " + Math.round( sg.bpm ) + " BPM" );
+	}
+	catch(err) { W().alert( "Could not load " + name + ": " + err.message ); }
+}
+function openMidiFile( f )
+{
+	f.arrayBuffer().then(function(buf){ openMidi( buf, f.name ); }, function(err){ W().alert( "Could not read " + f.name + ": " + err.message ); });
+}
+
+// dropping a .mid file on the page (or on the detached sequencer window) loads it
+function installDrop( w )
+{
+	var isMidi = function(f){ return /\.midi?$/i.test( f.name ) || f.type == "audio/midi" || f.type == "audio/mid"; };
+	var hasFiles = function(e){ return e.dataTransfer && Array.prototype.indexOf.call( e.dataTransfer.types || [], "Files" ) >= 0; };
+	w.addEventListener( "dragover", function(e){ if(hasFiles( e )) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } } );
+	w.addEventListener( "drop", function(e){
+		var f = e.dataTransfer && Array.prototype.find.call( e.dataTransfer.files || [], isMidi );
+		if(!f) return; // other files keep their own handling
+		e.preventDefault();
+		openMidiFile( f );
+	} );
+}
+installDrop( window );
+
 var midi_input = null;
 function midiFileInput()
 {
@@ -680,14 +749,7 @@ function midiFileInput()
 		var f = midi_input.files && midi_input.files[0];
 		midi_input.value = "";
 		if(!f) return;
-		var notes = song().tracks.reduce(function(a, t){ return a + t.notes.length; }, 0);
-		if(notes && !W().confirm( "Replace the song (" + notes + " notes) with " + f.name + "?" ))
-			return;
-		f.arrayBuffer().then(function(buf){
-			var sg = loadMidiFile( buf );
-			if(window.gfTrack) gfTrack( "midi-file", { tracks: sg.tracks.length } );
-			if(window.setStatus) setStatus( f.name + ": " + sg.tracks.length + " tracks, " + sg.bars + " bars at " + Math.round( sg.bpm ) + " BPM" );
-		}).catch(function(err){ W().alert( "Could not load " + f.name + ": " + err.message ); });
+		openMidiFile( f );
 	});
 	D().body.appendChild( midi_input );
 	return midi_input;
@@ -1136,6 +1198,7 @@ function detach()
 			window.dispatchEvent( new KeyboardEvent( type, { key: e.key, code: e.code, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, repeat: e.repeat } ) );
 		});
 	});
+	installDrop( w );
 	w.addEventListener( "pagehide", attach ); // closed (or reloaded): back home
 	clearInterval( sched_timer );
 	sched_timer = w.setInterval( scheduler, TICK );
@@ -1176,6 +1239,6 @@ setInterval(function(){
 loop( loop_token );
 
 // for the tests
-window.SEQ = { view: view, play: play, detach: detach, attach: attach, detached: function(){ return !!pop; }, applyCv: applyCv, cvValue: cvValue, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
+window.SEQ = { view: view, play: play, detach: detach, attach: attach, detached: function(){ return !!pop; }, applyCv: applyCv, cvValue: cvValue, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, openMidi: openMidi, midiList: function(){ return midi_list; }, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
 
 })();
