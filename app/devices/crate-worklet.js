@@ -1,8 +1,9 @@
 // devices/crate-worklet.js
 // CRATE 60 DSP, hosted by the rack processor: a pad sampler with a sequencer.
 //   - 64 pads (4 banks of 16). Each plays a sample: TUNE, LEVEL, PAN, ATTACK, DECAY, ONE SHOT or
-//     NOTE ON, MUTE GROUP (pads of a group cut each other), a low pass (CUTOFF, RESO), VELOCITY
-//     SENSITIVITY, START / END (a slice of the sample) and REVERSE. 32 voices.
+//     NOTE ON (with LOOP: round its part while held), MUTE GROUP (pads of a group cut each other), a
+//     low pass (CUTOFF, RESO), VELOCITY SENSITIVITY, START / END (a slice of the sample), REVERSE and
+//     MUTE. 32 voices.
 //   - Samples: the panel sends them ({ type: "sample" }): the factory kit (made there, once), files
 //     dropped on the pads, saved recordings. The SAMPLE page records the rear IN L / R here.
 //   - The sequencer: 16 sequences of 1-16 bars, 96 ticks a beat, events [tick, pad, velocity,
@@ -52,7 +53,7 @@ class CrateDSP {
 		this.hits = [];
 		// sampling
 		this.recState = "idle"; this.recId = null; this.recL = null; this.recR = null; this.recN = 0;
-		this.inPeak = [0, 0]; this.recorded = null;
+		this.inPeak = [0, 0]; this.outPeak = [0, 0]; this.recorded = null;
 		this.wave = null;
 	}
 
@@ -148,7 +149,7 @@ class CrateDSP {
 		const s = this.s, pad = p >= 0 ? s.pads[p] : null;
 		const id = pad ? pad.s : sampleId, smp = id && this.samples[id];
 		this.hits.push(p);
-		if (!smp) return;
+		if (!smp || (pad && pad.mute)) return;
 		const pd = pad || { tune: 0, level: 0.8, pan: 0, attack: 0, decay: 1, mode: "oneshot", group: 0, cutoff: 1, reso: 0, vel: 0.8, start: 0, end: 1, rev: false };
 		let tune = pd.tune, attack = pd.attack, decay = pd.decay, cutoff = pd.cutoff;
 		if (nv) {
@@ -179,6 +180,7 @@ class CrateDSP {
 		voice.dec = decay >= 0.999 ? 1 : Math.exp(-1 / ((0.02 * Math.pow(500, decay)) * sampleRate));
 		voice.relC = Math.exp(-1 / (Math.max(0.01, 0.02 * Math.pow(500, Math.min(decay, 0.9))) * sampleRate));
 		voice.mode = pd.mode == "noteon" ? 1 : 0;
+		voice.loop = !!pd.loop && voice.mode == 1; // LOOP: round the part while held
 		voice.stage = 0; voice.rel = false; voice.choke = false;
 		// the low pass
 		voice.filt = cutoff < 0.995;
@@ -273,7 +275,10 @@ class CrateDSP {
 			}
 			L += xl * v.gl * v.env; R += xr * v.gr * v.env;
 			v.pos += v.rate * v.dir;
-			if (v.pos >= v.b || v.pos < v.a) v.on = false;
+			if (v.pos >= v.b || v.pos < v.a) {
+				if (v.loop && !v.rel) v.pos += v.dir > 0 ? v.a - v.b : v.b - v.a;
+				else v.on = false;
+			}
 		}
 		// the click
 		if (this.click > 0.001) {
@@ -296,6 +301,9 @@ class CrateDSP {
 		if (s.monitor) { L += il; R += ir; }
 		const vol = s.volume;
 		outs[0] = L * vol; outs[1] = R * vol;
+		const ol = outs[0] < 0 ? -outs[0] : outs[0], or = outs[1] < 0 ? -outs[1] : outs[1];
+		if (ol > this.outPeak[0]) this.outPeak[0] = ol;
+		if (or > this.outPeak[1]) this.outPeak[1] = or;
 		return 0;
 	}
 
@@ -328,9 +336,9 @@ class CrateDSP {
 		const have = [];
 		for (const id in this.samples) have.push(id);
 		const st = { tick: this.ppos, playing: this.playing, have: have, hits: this.hits,
-			rec: this.recState, recT: this.recN / sampleRate, peak: this.inPeak.slice(), add: this.add, del: this.del };
+			rec: this.recState, recT: this.recN / sampleRate, peak: this.inPeak.slice(), out: this.outPeak.slice(), add: this.add, del: this.del };
 		this.hits = []; this.sentAdd = this.add; this.sentDel = this.del; this.add = []; this.del = [];
-		this.inPeak[0] *= 0.5; this.inPeak[1] *= 0.5;
+		this.inPeak[0] *= 0.5; this.inPeak[1] *= 0.5; this.outPeak[0] *= 0.5; this.outPeak[1] *= 0.5;
 		if (this.recorded) { st.recorded = this.recorded; this.recorded = null; }
 		if (this.wave) { st.wave = this.wave; this.wave = null; }
 		return st;

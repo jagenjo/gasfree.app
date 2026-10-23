@@ -1,20 +1,21 @@
 // devices/crate.js
-// CRATE 60 module: a pad sampler and sequencer in the classic beat-machine layout. Light grey case:
-// the LCD with its six soft keys (F1-F6) top left, the REC GAIN and MAIN VOLUME knobs beside it, the
-// mode keys (MAIN, PROGRAM, SAMPLE, TRIM, LOAD, GRID), the DATA wheel and the CURSOR keys, TAP TEMPO,
-// NOTE REPEAT, UNDO SEQ and ERASE, the LOCATE keys, the transport (REC, OVERDUB, STOP, PLAY,
-// PLAY START), the NOTE VARIATION slider, PAD BANK, FULL LEVEL and 16 LEVELS, and the 16 pads.
-// The pages of the LCD hold the parameters: click a field (or move with CURSOR) and turn the DATA
-// wheel, or drag the field up and down.
+// CRATE 60 module: a pad sampler and sequencer, laid out as a compact modern beat machine. A black
+// strip on top: MAIN VOLUME, the bank letters, the colour screen with its three keys, the level LEDs
+// and the speaker. The light grey body: the MODE keys (SAMPLE, SEQ, PROGRAM, TRIM, LOAD, PAD BANK),
+// SHIFT, the NOTE VARIATION fader, ERASE and NOTE REPEAT on the left; the K1-K3 knobs over the 16
+// lit pads in the middle; PAD PLAY (CHOP, MUTE, LOOP, 16 LEVELS), SAMPLE SELECT, TAP TEMPO, the DATA
+// encoder, - / +, SAMPLE RECORD, SEQ RECORD, STOP and PLAY on the right; a palm rest along the front.
+// SHIFT gives every key the function printed under it (pads 1-4 too). The pages of the screen hold
+// the parameters: click a field (or move with the arrows by DATA) and turn DATA, or drag the field.
 // Samples: the factory kit (made here once and sent to the DSP), audio files dropped on a pad, and
 // recordings of the rear IN L / R (SAMPLE page). Files and recordings are kept in this browser
 // (IndexedDB, "GASFREE_samples"); the patches only name them. DSP in crate-worklet.js.
 
 (function(){
 
-var SIZE = [1568, 780];
+var SIZE = [1568, 1000];
 var CASE = "#d7d6d0", INK = "#2a2a2a", DIM = "#6e6e6a", RED = "#c8332b", BLUE = "#7d93ab";
-var LCD_BG = "#a9b79a", LCD_INK = "#1d2619", LCD_DIM = "#5f6c56";
+var LCD_BG = "#0e1726", LCD_INK = "#eef2f6", LCD_DIM = "#7d8aa0", LCD_HI = "#f5c542";
 var BANKS = ["A", "B", "C", "D"];
 var TCS = ["OFF", "1/8", "1/8T", "1/16", "1/16T", "1/32"];
 var TC_TICKS = { "OFF": 1, "1/8": 48, "1/8T": 32, "1/16": 24, "1/16T": 16, "1/32": 12 };
@@ -261,7 +262,7 @@ function assign( s, pad, id, name )
 
 function padDefaults( name )
 {
-	return { s: name ? "f:" + name : "", name: name || "", tune: 0, level: 0.8, pan: 0, attack: 0, decay: 1, mode: "oneshot", group: 0, cutoff: 1, reso: 0, vel: 0.8, start: 0, end: 1, rev: false };
+	return { s: name ? "f:" + name : "", name: name || "", tune: 0, level: 0.8, pan: 0, attack: 0, decay: 1, mode: "oneshot", group: 0, cutoff: 1, reso: 0, vel: 0.8, start: 0, end: 1, rev: false, mute: false, loop: false };
 }
 
 function defaults()
@@ -322,7 +323,7 @@ function randomize( s )
 var M = null, S = null, ST = null;
 var uis = {};
 function uiOf( m ) { m = m || M; return uis[ m.id ] || (uis[ m.id ] = { screen: "main", cur: 0, wave: null, list: 0, gridBar: 0, clip: null, undo: null,
-	flash: new Float64Array( 64 ), down: {}, taps: [], rec: false, od: false, levels: false, levelsPad: 0, wheelAcc: 0, wheelAng: 0, last: null }); }
+	flash: new Float64Array( 64 ), down: {}, taps: [], rec: false, od: false, levels: false, levelsPad: 0, wheelAcc: 0, wheelAng: 0, last: null, shift: false }); }
 function send( msg ) { var id = M.id; act(function(){ rack.postModule( id, msg ); }); }
 function padName( p ) { return BANKS[ p >> 4 ] + String( (p & 15) + 1 ).padStart( 2, "0" ); }
 function seq() { return S.seqs[ S.seq ]; }
@@ -413,7 +414,7 @@ function led( x, y, on, color )
 // ---------------------------------------------------------------------------
 // the LCD: pages of fields. A field: { id, x, y (pixels in the LCD), label, get, set, fmt, min, max, step, w }
 
-var LX = 172, LY = 86, LW = 516, LH = 202;    // the screen
+var LX = 520, LY = 62, LW = 520, LH = 196;    // the screen
 var CH = 7.8, LINE = 16;                      // a character, a line (13 px monospace)
 
 function lcdText( text, x, y, inv, dim )
@@ -491,6 +492,7 @@ function fields( u )
 			list( "stereo", "MODE:", 8, 48, function(){ return S.stereo ? "STEREO" : "MONO"; }, function(v){ S.stereo = v == "STEREO"; }, ["MONO", "STEREO"], 6 ),
 			num( "thresh", "THRESHOLD:", 200, 48, function(){ return S.thresh; }, function(v){ S.thresh = v; }, -60, 0, 1, function(v){ return v + " dB"; }, 6 ),
 			num( "max", "MAX TIME:", 8, 66, function(){ return S.max_time; }, function(v){ S.max_time = v; }, 1, 30, 1, function(v){ return v + " S"; }, 4 ),
+			num( "gain", "GAIN:", 360, 66, function(){ return Math.round( 20 * Math.log10( Math.max( S.rec_gain, 1e-4 ) ) ); }, function(v){ S.rec_gain = Math.pow( 10, v / 20 ); }, -24, 12, 1, function(v){ return (v > 0 ? "+" : "") + v + " dB"; }, 6 ),
 			list( "mon", "MONITOR:", 200, 66, function(){ return S.monitor ? "ON" : "OFF"; }, function(v){ S.monitor = v == "ON"; }, ["OFF", "ON"], 3 )
 		];
 		case "trim": return [
@@ -537,20 +539,19 @@ function nudge( u, d )
 function drawLcd()
 {
 	var u = uiOf();
-	// bezel and screen
-	ctx.fillStyle = "#2b2c2e"; ctx.beginPath(); ctx.roundRect( LX - 14, LY - 14, LW + 28, LH + 28, 6 ); ctx.fill();
-	var g = ctx.createLinearGradient( 0, LY, 0, LY + LH );
-	g.addColorStop( 0, "#b3c1a3" ); g.addColorStop( 1, LCD_BG );
-	ctx.fillStyle = g; ctx.fillRect( LX, LY, LW, LH );
+	ctx.fillStyle = "#000"; ctx.beginPath(); ctx.roundRect( LX - 10, LY - 8, LW + 20, LH + 16, 6 ); ctx.fill();
+	ctx.fillStyle = LCD_BG; ctx.fillRect( LX, LY, LW, LH );
 	ctx.save(); ctx.beginPath(); ctx.rect( LX, LY, LW, LH ); ctx.clip();
 	var st = ST || {}, playing = st.playing;
 	// the title line: page, transport, position
 	var title = SCREENS.find(function(x){ return x[0] == u.screen; })[1];
-	lcdText( " " + title + " ", 4, 9, true );
-	var tr = playing ? (u.rec ? "REC" : (u.od ? "OVERDUB" : "PLAY")) : (u.rec ? "REC READY" : (u.od ? "ODUB READY" : "STOP"));
-	lcdText( tr, 160, 9, false );
-	lcdText( "BAR " + fmtPos( st.tick || 0 ), LW - 18 * CH, 9, false );
-	ctx.fillStyle = LCD_INK; ctx.fillRect( LX, LY + 18, LW, 1 );
+	ctx.fillStyle = LCD_HI; ctx.fillRect( LX + 3, LY + 2, title.length * CH + 10, 14 );
+	ctx.font = "bold 13px 'Courier New', Courier, monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+	ctx.fillStyle = LCD_BG; ctx.fillText( title, LX + 8, LY + 9 );
+	var tr = playing ? (u.rec ? "● REC" : (u.od ? "● ODUB" : "▶ PLAY")) : (u.rec ? "REC READY" : (u.od ? "ODUB READY" : "■ STOP"));
+	ctx.fillStyle = playing && (u.rec || u.od) ? "#ff5a4f" : (playing ? "#5fd36a" : LCD_INK); ctx.fillText( tr, LX + 170, LY + 9 );
+	ctx.fillStyle = "#ff5a4f"; ctx.fillText( fmtPos( st.tick || 0 ), LX + LW - 13 * CH, LY + 9 );
+	ctx.fillStyle = LCD_DIM; ctx.fillRect( LX, LY + 18, LW, 1 );
 
 	var fs = fields( u );
 	if(u.cur >= fs.length) u.cur = 0;
@@ -562,21 +563,22 @@ function drawLcd()
 	else if(u.screen == "load") drawLoad( u );
 	else if(u.screen == "grid") drawGrid( u, st );
 
-	// the soft keys' names
-	var soft = softKeys( u );
-	soft.forEach(function(k, i){
-		if(!k) return;
-		var x = 6 + i * 86, w = 80;
-		ctx.fillStyle = LCD_INK; ctx.fillRect( LX + x, LY + LH - 17, w, 15 );
-		ctx.font = "bold 12px 'Courier New', Courier, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-		ctx.fillStyle = LCD_BG; ctx.fillText( k[0], LX + x + w / 2, LY + LH - 9 );
-	});
-	ctx.restore();
-	// the F keys
-	for(var i = 0; i < 6; ++i)
+	// the three keys' names: F4-F6 with SHIFT
+	var soft = softKeys( u ), off = u.shift ? 3 : 0;
+	for(var i = 0; i < 3; ++i)
 	{
-		var k = soft[i];
-		if(key( "f" + (i + 1), LX + 6 + i * 86 + 40, LY + LH + 26, 64, 18, "F" + (i + 1), { tip: k ? k[0] : "" } ).clicked && k) k[1]();
+		var k = soft[ i + off ], x = 10 + i * 172, w = 156;
+		ctx.fillStyle = k ? "#22324a" : "rgba(255,255,255,0.04)"; ctx.fillRect( LX + x, LY + LH - 17, w, 15 );
+		if(!k) continue;
+		ctx.font = "bold 12px 'Courier New', Courier, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		ctx.fillStyle = LCD_INK; ctx.fillText( k[0], LX + x + w / 2, LY + LH - 9 );
+	}
+	ctx.restore();
+	// the keys over the screen
+	for(var i = 0; i < 3; ++i)
+	{
+		var k = soft[ i + off ];
+		if(key( "f" + (i + 1), LX + 10 + i * 172 + 78, 16, 84, 26, "", { color: "#1b1b1c", tip: k ? k[0] : "(SHIFT: THE OTHER THREE)" } ).clicked && k) { k[1](); u.shift = false; }
 	}
 }
 
@@ -606,7 +608,7 @@ function drawMeters( st )
 		ctx.fillRect( tx, y - 9, 2, 18 );
 	});
 	var msg = st.rec == "armed" ? "WAITING FOR THE SIGNAL (OVER THE THRESHOLD)..." : (st.rec == "recording" ? "RECORDING " + (st.recT || 0).toFixed( 1 ) + " S" :
-		"CABLE AUDIO TO IN L / R ON THE BACK, THEN F6");
+		"CABLE AUDIO TO IN L / R ON THE BACK, THEN SAMPLE RECORD");
 	lcdText( msg, 8, 136, st.rec == "recording" );
 }
 
@@ -624,7 +626,7 @@ function drawTrim( u )
 		for(var c = 0; c < N; ++c) { var x = x0 + c / N * w, a = pk[c * 2], b = pk[c * 2 + 1]; ctx.fillRect( x, cy - b * h / 2, Math.max( 1, w / N ), Math.max( 1, (b - a) * h / 2 ) ); }
 	}
 	// outside the slice: dimmed
-	ctx.fillStyle = "rgba(169,183,154,0.7)";
+	ctx.fillStyle = "rgba(14,23,38,0.72)";
 	ctx.fillRect( x0, y0, p.start * w, h ); ctx.fillRect( x0 + p.end * w, y0, (1 - p.end) * w, h );
 	ctx.fillStyle = LCD_INK; ctx.fillRect( x0 + p.start * w, y0, 2, h ); ctx.fillRect( x0 + p.end * w - 2, y0, 2, h );
 	if(u.wave.len) lcdText( (u.wave.len * (p.end - p.start)).toFixed( 3 ) + " S", LW - 90, 30, false );
@@ -668,7 +670,7 @@ function drawGrid( u, st )
 			var t0 = bar * BAR + c * 24;
 			var on = q.ev.some(function(e){ return e[1] == p && e[0] >= t0 && e[0] < t0 + 24; });
 			var x = x0 + c * cw;
-			ctx.fillStyle = on ? LCD_INK : (c % 4 == 0 ? "rgba(29,38,25,0.18)" : "rgba(29,38,25,0.08)");
+			ctx.fillStyle = on ? LCD_HI : (c % 4 == 0 ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.07)");
 			ctx.fillRect( x + 1, y + 1, cw - 2, rh - 2 );
 			var hr = hot( "grid_" + r + "_" + c, x, y, cw, rh );
 			if(hr.clicked)
@@ -682,7 +684,7 @@ function drawGrid( u, st )
 	}
 	if(st.tick !== undefined && Math.floor( st.tick / BAR ) == bar)
 	{
-		ctx.fillStyle = "rgba(29,38,25,0.35)";
+		ctx.fillStyle = "rgba(255,255,255,0.5)";
 		ctx.fillRect( x0 + (st.tick % BAR) / BAR * (LW - 48), y0, 2, 16 * rh );
 	}
 }
@@ -748,108 +750,166 @@ function audition( p ) { send({ type: "pad", pad: p, vel: 0.9, on: true }); var 
 // ---------------------------------------------------------------------------
 // the controls
 
-// the DATA wheel: drag it round (up / down), or the mouse wheel over it
+// the DATA encoder: drag it (up / down), or the mouse wheel over it. SHIFT + DATA: the field
 function drawWheel( cx, cy, r )
 {
 	var u = uiOf(), id = "data", full = id_prefix + id;
 	var hover = !cable_drag && (ui.active === null || ui.active === full) && hitCircle( cx, cy, r );
 	if(hover) ui.hot = full;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; u.wy = ui.y; }
+	var turn = function(d){
+		if(u.shift) { var n = Math.max( 1, fields( u ).length ); u.cur = ((u.cur + d) % n + n) % n; }
+		else nudge( u, d );
+		u.wheelAng += d * 0.25;
+	};
 	if(ui.active === full && ui.down)
 	{
 		var steps = Math.trunc( (u.wy - ui.y) / 6 );
-		if(steps) { nudge( u, steps ); u.wy -= steps * 6; u.wheelAng += steps * 0.25; }
+		if(steps) { turn( steps ); u.wy -= steps * 6; }
 	}
-	if(hover && ui.wheel && ui.active === null) { nudge( u, -ui.wheel ); u.wheelAng -= ui.wheel * 0.25; ui.wheel = 0; }
+	if(hover && ui.wheel && ui.active === null) { turn( -ui.wheel ); ui.wheel = 0; }
+	if(hover) tip( "DATA: TURN THE FIELD (DRAG OR WHEEL). SHIFT + DATA: ANOTHER FIELD", cx, cy + r + 18 );
 	ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.arc( cx + 2, cy + 5, r, 0, Math.PI * 2 ); ctx.fill();
-	var g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r );
-	g.addColorStop( 0, "#ffffff" ); g.addColorStop( 0.7, hover ? "#e8e8e4" : "#dcdcd7" ); g.addColorStop( 1, "#a9a9a4" );
-	ctx.fillStyle = g; ctx.beginPath(); ctx.arc( cx, cy, r, 0, Math.PI * 2 ); ctx.fill();
-	ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc( cx, cy, r * 0.82, 0, Math.PI * 2 ); ctx.stroke();
-	// the finger dimple
-	var a = u.wheelAng - Math.PI / 2, dx = cx + Math.cos( a ) * r * 0.6, dy = cy + Math.sin( a ) * r * 0.6;
-	g = ctx.createRadialGradient( dx + 2, dy + 2, 1, dx, dy, r * 0.17 );
-	g.addColorStop( 0, "#bdbdb8" ); g.addColorStop( 1, "#ececE8" );
-	ctx.fillStyle = g; ctx.beginPath(); ctx.arc( dx, dy, r * 0.17, 0, Math.PI * 2 ); ctx.fill();
-	T( "DATA", cx + r + 14, cy - r + 6, 9, INK, "left" );
+	// a ribbed skirt, a smooth cap
+	ctx.fillStyle = "#cfcfca"; ctx.beginPath(); ctx.arc( cx, cy, r, 0, Math.PI * 2 ); ctx.fill();
+	ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 1.5;
+	for(var i = 0; i < 40; ++i) { var a = u.wheelAng + i * Math.PI / 20; ctx.beginPath(); ctx.moveTo( cx + Math.cos( a ) * r * 0.8, cy + Math.sin( a ) * r * 0.8 ); ctx.lineTo( cx + Math.cos( a ) * r, cy + Math.sin( a ) * r ); ctx.stroke(); }
+	var g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r * 0.78 );
+	g.addColorStop( 0, "#ffffff" ); g.addColorStop( 1, hover ? "#deded9" : "#d2d2cd" );
+	ctx.fillStyle = g; ctx.beginPath(); ctx.arc( cx, cy, r * 0.76, 0, Math.PI * 2 ); ctx.fill();
+	var a = u.wheelAng - Math.PI / 2;
+	ctx.fillStyle = "#8a8a86"; ctx.beginPath(); ctx.arc( cx + Math.cos( a ) * r * 0.55, cy + Math.sin( a ) * r * 0.55, r * 0.08, 0, Math.PI * 2 ); ctx.fill();
+	T( "DATA", cx, cy + r + 12, 9, INK );
 }
 
-function transport( u, st )
+// a key with its SHIFT function printed under it (centre x, top y)
+function skey( id, cx, y, w, h, label, sub, o )
 {
-	var playing = st && st.playing;
-	var startRec = function(fromStart){
-		if(u.rec || u.od) { u.undo = { seq: S.seq, ev: seq().ev.slice() }; if(u.rec) seq().ev = []; }
-		send({ type: "rec", rec: u.rec, od: u.od });
-		send({ type: "play", from: fromStart ? "start" : "cont" });
-	};
-	if(key( "rec", 150, 690, 80, 34, "REC", { color: "#d8463c", led: u.rec, tip: "REC: ARM, THEN PLAY (THE SEQUENCE IS RECORDED AGAIN; UNDO SEQ BRINGS IT BACK)" } ).clicked)
-	{ u.rec = !u.rec; u.od = false; if(playing) { if(u.rec) u.undo = { seq: S.seq, ev: seq().ev.slice() }; send({ type: "rec", rec: u.rec, od: false }); } }
-	if(key( "overdub", 245, 690, 80, 34, "OVERDUB", { color: "#d8463c", led: u.od, tip: "OVERDUB: WHAT YOU PLAY IS ADDED" } ).clicked)
-	{ u.od = !u.od; u.rec = false; if(playing) { if(u.od) u.undo = { seq: S.seq, ev: seq().ev.slice() }; send({ type: "rec", rec: false, od: u.od }); } }
-	if(key( "stop", 340, 690, 80, 34, "STOP" ).clicked)
-	{ if(!playing) send({ type: "locate", tick: 0 }); send({ type: "stop" }); u.rec = u.od = false; send({ type: "rec", rec: false, od: false }); }
-	if(key( "play", 435, 690, 80, 34, "PLAY", { led: playing } ).clicked && !playing) startRec( false );
-	if(key( "play_start", 530, 690, 80, 34, "PLAY START" ).clicked) { if(playing) send({ type: "stop" }); startRec( true ); }
+	o = o || {};
+	var r = key( id, cx, y, w, h, "", { color: o.color || "#5b5c5f", inside: label, ink: o.ink || "#f2f2ef", size: o.size || 9, tip: o.tip } );
+	if(o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect( cx - w / 2 + 8, y + h - 7 + (r.held ? 2 : 0), w - 16, 3 ); }
+	if(o.led !== undefined) led( cx + w / 2 - 7, y + 6 + (r.held ? 2 : 0), o.led, o.ledColor );
+	if(sub) T( sub, cx, y + h + 10, 8, uiOf().shift ? RED : INK );
+	return r;
 }
 
 function drawControls()
 {
-	var u = uiOf(), st = ST || {}, q = seq();
-	// REC GAIN, MAIN VOLUME
-	T( "REC GAIN", 92, 96, 9 ); T( "MAIN VOLUME", 92, 204, 9 );
-	S.rec_gain = knob( "rec_gain", 92, 130, 22, S.rec_gain, 0, 4, { def: 1, format: function(v){ return (20 * Math.log10( Math.max( v, 1e-4 ) )).toFixed( 1 ) + " dB"; } } );
-	S.volume = knob( "volume", 92, 238, 22, S.volume, 0, 1.2, { def: 0.8, format: fmtPct } );
+	var u = uiOf(), st = ST || {}, q = seq(), sh = u.shift;
+	var go = function(screen){ u.screen = screen; u.cur = 0; };
 
-	// the mode keys
-	T( "MODE", 240, 362, 9, DIM );
-	SCREENS.forEach(function(sc, i){
-		var cx = 150 + (i % 3) * 90, y = 378 + Math.floor( i / 3 ) * 56;
-		if(key( "mode_" + sc[0], cx, y, 74, 24, sc[1], { color: BLUE, led: u.screen == sc[0] } ).clicked) { u.screen = sc[0]; u.cur = 0; }
+	// MODE
+	T( "MODE", 180, 290, 9, DIM );
+	var modes = [
+		["k_sample", 120, 300, "SAMPLE", "LOAD", null, function(){ go( sh ? "load" : "sample" ); }],
+		["k_seq", 245, 300, "SEQ", "STEP EDIT", null, function(){ go( sh ? "grid" : "main" ); }],
+		["k_program", 120, 368, "PROGRAM", "COPY PAD", "#ef7b2d", function(){ if(sh) u.clip = JSON.parse( JSON.stringify( S.pads[ S.sel ] ) ); else go( "program" ); }],
+		["k_trim", 245, 368, "TRIM", "PASTE PAD", "#ef7b2d", function(){ if(sh) { if(u.clip) S.pads[ S.sel ] = JSON.parse( JSON.stringify( u.clip ) ); } else go( "trim" ); }],
+		["k_load", 120, 436, "SAMPLE\nSELECT", "SAVE AS NEW", null, function(){ go( "load" ); }],
+		["k_bank", 245, 436, "PAD BANK", "BANK -", null, function(){ S.bank = (S.bank + (sh ? 3 : 1)) % 4; }]
+	];
+	modes.forEach(function(m){
+		var on = (m[0] == "k_sample" && (u.screen == "sample" || u.screen == "load")) || (m[0] == "k_seq" && (u.screen == "main" || u.screen == "grid")) ||
+			(m[0] == "k_program" && u.screen == "program") || (m[0] == "k_trim" && u.screen == "trim");
+		if(m[0] == "k_load") return;
+		if(skey( m[0], m[1], m[2], 104, 32, m[3], m[4], { color: m[5] || "#5b5c5f", led: m[0] == "k_bank" ? undefined : on, ledColor: "#7dff8a" } ).clicked) { m[6](); u.shift = false; }
+	});
+	if(skey( "shift", 120, 436, 104, 32, "SHIFT", "", { color: "#2e2f31", led: sh, ledColor: "#ffffff", tip: "SHIFT: CLICK IT, THEN A KEY FOR THE FUNCTION UNDER IT (OR HOLD IT)" } ).clicked) u.shift = !u.shift;
+
+	// the NOTE VARIATION fader in its recess, its ASSIGN key and LED
+	ctx.fillStyle = "#c2c1bb"; ctx.beginPath(); ctx.roundRect( 140, 512, 84, 236, 8 ); ctx.fill();
+	ctx.fillStyle = "#b3b2ac"; ctx.fillRect( 150, 522, 64, 216 );
+	S.nv_val = fader( "nv_val", 182, 540, 180, S.nv_val, { def: 0.5 } );
+	led( 236, 540, S.nv != "OFF", "#ffffff" );
+	if(key( "nv_assign", 280, 530, 64, 20, "", { inside: S.nv == "OFF" ? "ASSIGN" : S.nv, size: 8, color: "#5b5c5f", ink: "#f2f2ef", tip: "WHAT THE FADER CHANGES ON THE PADS: OFF, TUNE, DECAY, ATTACK, FILTER" } ).clicked)
+		S.nv = NV[ (NV.indexOf( S.nv ) + 1) % NV.length ];
+	T( "NOTE VAR", 280, 566, 8, INK ); T( nvText(), 280, 580, 8, RED );
+
+	// ERASE, NOTE REPEAT
+	var er = skey( "erase", 120, 800, 104, 32, "ERASE", "COPY SEQ", { tip: "HOLD IT AND PADS WHILE PLAYING: THEIR NOTES GO. STOPPED: CLEARS THE SELECTED PAD. SHIFT: COPY THE SEQUENCE TO THE NEXT EMPTY ONE" } );
+	if(sh && er.clicked) { var n = S.seqs.findIndex(function(x, i){ return i > S.seq && !x.ev.length; }); if(n >= 0) { S.seqs[n] = JSON.parse( JSON.stringify( q ) ); S.seq = n; } u.shift = false; }
+	else
+	{
+		if(!!er.held != !!u.erase) { u.erase = !!er.held; send({ type: "erase", on: u.erase }); if(u.erase && st.playing) u.undo = { seq: S.seq, ev: q.ev.slice() }; }
+		if(er.clicked && !st.playing) { u.undo = { seq: S.seq, ev: q.ev }; q.ev = q.ev.filter(function(e){ return e[1] != S.sel; }); }
+	}
+	var triplet = /T$/.test( S.tc );
+	var nr = skey( "repeat", 245, 800, 104, 32, "NOTE\nREPEAT", "TRIPLET", { led: !!u.repeat || triplet, ledColor: triplet ? "#ffb02f" : undefined, tip: "HOLD IT AND A PAD: THE PAD REPEATS AT TIMING CORRECT. SHIFT: TRIPLETS ON / OFF" } );
+	if(sh && nr.clicked) { var tri = { "1/8": "1/8T", "1/8T": "1/8", "1/16": "1/16T", "1/16T": "1/16", "1/32": "1/16T", "OFF": "1/16T" }; S.tc = tri[ S.tc ]; u.shift = false; }
+	else if(!!nr.held != !!u.repeat) { u.repeat = !!nr.held; send({ type: "repeat", on: u.repeat }); }
+
+	// K1-K3: the selected pad's TUNE, CUTOFF, DECAY
+	var p = S.pads[ S.sel ];
+	[["k1", "K1 TUNE", 640], ["k2", "K2 CUTOFF", 802], ["k3", "K3 DECAY", 964]].forEach(function(k, i){
+		ctx.fillStyle = "#c9c8c2"; ctx.beginPath(); ctx.arc( k[2], 304, 34, 0, Math.PI * 2 ); ctx.fill();
+		if(i == 0) p.tune = knob( k[0], k[2], 304, 24, p.tune, -24, 24, { bipolar: true, def: 0, format: function(v){ return padName( S.sel ) + " TUNE " + (v > 0 ? "+" : "") + v.toFixed( 2 ); } } );
+		else if(i == 1) p.cutoff = knob( k[0], k[2], 304, 24, p.cutoff, 0, 1, { def: 1, format: function(v){ return padName( S.sel ) + " CUTOFF " + (v >= 0.995 ? "OPEN" : Math.round( v * 100 )); } } );
+		else p.decay = knob( k[0], k[2], 304, 24, p.decay, 0, 1, { def: 1, format: function(v){ return padName( S.sel ) + " DECAY " + (v >= 0.999 ? "FULL" : Math.round( v * 100 )); } } );
+		T( k[1], k[2], 350, 9, INK );
 	});
 
-	// the DATA wheel and the CURSOR keys
-	drawWheel( 520, 440, 62 );
-	var cx = 690, cy = 440;
-	T( "CURSOR", cx, cy - 58, 9, DIM );
-	if(key( "cur_up", cx, cy - 46, 40, 26, "", { inside: "▲" } ).clicked) { var fs = fields( u ); u.cur = (u.cur + fs.length - 1) % Math.max( 1, fs.length ); }
-	if(key( "cur_dn", cx, cy + 20, 40, 26, "", { inside: "▼" } ).clicked) { var fs2 = fields( u ); u.cur = (u.cur + 1) % Math.max( 1, fs2.length ); }
-	if(key( "cur_l", cx - 46, cy - 13, 40, 26, "", { inside: "−", tip: "THE FIELD'S VALUE -1" } ).clicked) nudge( u, -1 );
-	if(key( "cur_r", cx + 46, cy - 13, 40, 26, "", { inside: "+", tip: "THE FIELD'S VALUE +1" } ).clicked) nudge( u, 1 );
+	// PAD PLAY
+	ctx.fillStyle = INK; ctx.fillRect( 1100, 290, 300, 1 );
+	T( "PAD PLAY", 1250, 290, 9, INK );
+	ctx.fillStyle = CASE; ctx.fillRect( 1218, 284, 64, 12 ); T( "PAD PLAY", 1250, 290, 9, INK );
+	var BL = "#3d8fd6";
+	var c = skey( "chop", 1165, 302, 120, 32, "CHOP", "NOTE ON", { color: BL, led: p.mode == "noteon", tip: "CHOP: THE TRIM PAGE, TO CUT THE PAD'S SAMPLE. SHIFT: NOTE ON (THE PAD PLAYS WHILE HELD)" } );
+	if(c.clicked) { if(sh) p.mode = p.mode == "noteon" ? "oneshot" : "noteon"; else go( "trim" ); u.shift = false; }
+	var mu = skey( "mute", 1325, 302, 120, 32, "MUTE", "UNMUTE ALL", { color: BL, led: !!p.mute, tip: "MUTE: THE SELECTED PAD STAYS SILENT. SHIFT: EVERY PAD BACK" } );
+	if(mu.clicked) { if(sh) S.pads.forEach(function(x){ x.mute = false; }); else p.mute = !p.mute; u.shift = false; }
+	var lp = skey( "loop", 1165, 368, 120, 32, "LOOP", "REVERSE", { color: BL, led: sh ? !!p.rev : !!p.loop, tip: "LOOP: THE PAD LOOPS ITS PART WHILE HELD (NOTE ON). SHIFT: REVERSE" } );
+	if(lp.clicked) { if(sh) p.rev = !p.rev; else { p.loop = !p.loop; if(p.loop) p.mode = "noteon"; } u.shift = false; }
+	var lv = skey( "levels", 1325, 368, 120, 32, "16 LEVELS", "TYPE: " + S.levels, { color: BL, led: u.levels, tip: "16 LEVELS: THE SELECTED PAD ON ALL 16 PADS. SHIFT: BY VELOCITY OR BY TUNE" } );
+	if(lv.clicked) { if(sh) S.levels = S.levels == "TUNE" ? "VELOCITY" : "TUNE"; else { u.levels = !u.levels; u.levelsPad = S.sel; } u.shift = false; }
 
-	// TAP TEMPO, NOTE REPEAT, UNDO SEQ, ERASE
-	if(key( "tap", 150, 520, 74, 24, "TAP TEMPO", { tip: "TAP THE BEAT: THE TEMPO FOLLOWS" } ).clicked)
+	// SAMPLE SELECT, TAP TEMPO
+	if(skey( "k_select", 1165, 442, 120, 32, "SAMPLE\nSELECT", "SAVE SAMPLE", { tip: "THE LOAD PAGE: THE SAMPLES TO PUT ON THE PAD" } ).clicked) { go( "load" ); u.shift = false; }
+	var tp = skey( "tap", 1325, 442, 120, 32, "TAP TEMPO", "METRO: " + S.click, { tip: "TAP THE BEAT: THE TEMPO FOLLOWS. SHIFT: THE CLICK (OFF, WHILE RECORDING, ALWAYS)" } );
+	if(tp.clicked)
 	{
-		var now = performance.now();
-		u.taps = u.taps.filter(function(t){ return now - t < 2500; }).concat([ now ]);
-		if(u.taps.length >= 2) { var d = (u.taps[ u.taps.length - 1 ] - u.taps[0]) / (u.taps.length - 1); S.tempo = Math.max( 30, Math.min( 300, Math.round( 600000 / d ) / 10 ) ); }
+		if(sh) { S.click = { "OFF": "REC", "REC": "ON", "ON": "OFF" }[ S.click ]; u.shift = false; }
+		else
+		{
+			var now = performance.now();
+			u.taps = u.taps.filter(function(t){ return now - t < 2500; }).concat([ now ]);
+			if(u.taps.length >= 2) { var d = (u.taps[ u.taps.length - 1 ] - u.taps[0]) / (u.taps.length - 1); S.tempo = Math.max( 30, Math.min( 300, Math.round( 600000 / d ) / 10 ) ); }
+		}
 	}
-	var nr = key( "repeat", 240, 520, 74, 24, "NOTE REPEAT", { led: !!u.repeat, tip: "HOLD IT AND A PAD: THE PAD REPEATS AT TIMING CORRECT" } );
-	if(!!nr.held != !!u.repeat) { u.repeat = !!nr.held; send({ type: "repeat", on: u.repeat }); }
-	if(key( "undo", 330, 520, 74, 24, "UNDO SEQ", { tip: "BACK TO THE SEQUENCE BEFORE THE LAST RECORDING OR EDIT" } ).clicked && u.undo)
-	{ var cur = S.seqs[ u.undo.seq ].ev; S.seqs[ u.undo.seq ].ev = u.undo.ev; u.undo = { seq: u.undo.seq, ev: cur }; }
-	var er = key( "erase", 420, 520, 74, 24, "ERASE", { led: !!u.erase, tip: "HOLD IT AND PADS WHILE PLAYING: THEIR NOTES GO. STOPPED: CLEARS THE SELECTED PAD" } );
-	if(!!er.held != !!u.erase) { u.erase = !!er.held; send({ type: "erase", on: u.erase }); if(u.erase && st.playing) u.undo = { seq: S.seq, ev: q.ev.slice() }; }
-	if(er.clicked && !st.playing) { u.undo = { seq: S.seq, ev: q.ev }; q.ev = q.ev.filter(function(e){ return e[1] != S.sel; }); }
 
-	// LOCATE
-	ctx.fillStyle = DIM; ctx.fillRect( 112, 586, 380, 1 );
-	T( "LOCATE", 300, 586, 9, DIM );
-	var tick = st.tick || 0, g = TC_TICKS[ S.tc ] || 24, L = q.bars * BAR;
-	var loc = function(t){ send({ type: "locate", tick: ((t % L) + L) % L }); };
-	if(key( "bar_dn", 150, 600, 74, 22, "<< BAR" ).clicked) loc( Math.ceil( tick / BAR ) * BAR - BAR );
-	if(key( "step_dn", 240, 600, 74, 22, "< STEP" ).clicked) loc( Math.ceil( tick / g ) * g - g );
-	if(key( "step_up", 330, 600, 74, 22, "STEP >" ).clicked) loc( Math.floor( tick / g ) * g + g );
-	if(key( "bar_up", 420, 600, 74, 22, "BAR >>" ).clicked) loc( Math.floor( tick / BAR ) * BAR + BAR );
+	// DATA, the field arrows, - / +
+	drawWheel( 1470, 470, 54 );
+	if(key( "cur_up", 1440, 550, 28, 20, "", { inside: "▲", size: 9, tip: "THE FIELD BEFORE" } ).clicked) { var n1 = Math.max( 1, fields( u ).length ); u.cur = (u.cur + n1 - 1) % n1; }
+	if(key( "cur_dn", 1500, 550, 28, 20, "", { inside: "▼", size: 9, tip: "THE NEXT FIELD" } ).clicked) { var n2 = Math.max( 1, fields( u ).length ); u.cur = (u.cur + 1) % n2; }
+	var undo = function(){ if(u.undo) { var cur = S.seqs[ u.undo.seq ].ev; S.seqs[ u.undo.seq ].ev = u.undo.ev; u.undo = { seq: u.undo.seq, ev: cur }; } };
+	if(skey( "minus", 1165, 520, 120, 32, "−", "UNDO", { size: 16, tip: "THE FIELD -1. SHIFT: UNDO (THE SEQUENCE BEFORE THE LAST RECORDING OR EDIT)" } ).clicked) { if(sh) undo(); else nudge( u, -1 ); u.shift = false; }
+	if(skey( "plus", 1325, 520, 120, 32, "+", "REDO", { size: 16, tip: "THE FIELD +1. SHIFT: REDO" } ).clicked) { if(sh) undo(); else nudge( u, 1 ); u.shift = false; }
 
-	transport( u, st );
-
-	// NOTE VARIATION: the slider and its ASSIGN key
-	T( "NOTE", 50, 336, 8, INK ); T( "VARIATION", 50, 347, 8, INK );
-	if(key( "nv_assign", 50, 366, 50, 18, "", { inside: S.nv == "OFF" ? "ASSIGN" : S.nv, size: 8, led: S.nv != "OFF", tip: "WHAT THE SLIDER CHANGES ON THE PADS: OFF, TUNE, DECAY, ATTACK, FILTER" } ).clicked)
-		S.nv = NV[ (NV.indexOf( S.nv ) + 1) % NV.length ];
-	ctx.fillStyle = "#c4c3bd"; ctx.fillRect( 22, 410, 56, 330 );
-	S.nv_val = fader( "nv_val", 50, 424, 296, S.nv_val, { def: 0.5 } );
-	T( nvText(), 50, 760, 8, INK );
+	// SAMPLE RECORD, SEQ RECORD, STOP, PLAY
+	var playing = st.playing;
+	var sr = skey( "sample_rec", 1165, 610, 120, 40, "SAMPLE\nRECORD", "MONITOR", { stripe: "#e2392f", led: st.rec && st.rec != "idle", tip: "SAMPLE RECORD: THE SAMPLE PAGE, ARMED: IT RECORDS THE REAR IN L / R ONTO THE SELECTED PAD (AGAIN: STOP). SHIFT: MONITOR" } );
+	if(sr.clicked)
+	{
+		if(sh) S.monitor = !S.monitor;
+		else if(st.rec && st.rec != "idle") send({ type: "recStop" });
+		else { go( "sample" ); send({ type: "recArm", id: newId(), max: S.max_time, stereo: S.stereo }); }
+		u.shift = false;
+	}
+	var qr = skey( "seq_rec", 1325, 610, 120, 40, "SEQ\nRECORD", "REPLACE", { stripe: "#e2392f", led: u.od || u.rec, tip: "SEQ RECORD: WHAT YOU PLAY IS ADDED (ARM IT, THEN PLAY; OR WHILE PLAYING). SHIFT: RECORD AGAIN FROM EMPTY (UNDO BRINGS IT BACK)" } );
+	if(qr.clicked)
+	{
+		if(sh) { u.rec = !u.rec; u.od = false; } else { u.od = !(u.od || u.rec); u.rec = false; }
+		if(playing) { if(u.rec || u.od) u.undo = { seq: S.seq, ev: q.ev.slice() }; send({ type: "rec", rec: u.rec, od: u.od }); }
+		u.shift = false;
+	}
+	if(skey( "stop", 1165, 692, 120, 40, "■", "TO START", { size: 16, stripe: "#ffffff", tip: "STOP (STOPPED: BACK TO THE START)" } ).clicked)
+	{ if(!playing || sh) send({ type: "locate", tick: 0 }); send({ type: "stop" }); u.rec = u.od = false; send({ type: "rec", rec: false, od: false }); u.shift = false; }
+	if(skey( "play", 1325, 692, 120, 40, "▶", "CONTINUE", { size: 16, stripe: "#5fd36a", led: playing, ledColor: "#5fd36a", tip: "PLAY FROM THE START. SHIFT: FROM WHERE IT STOPPED" } ).clicked && !playing)
+	{
+		if(u.rec || u.od) { u.undo = { seq: S.seq, ev: q.ev.slice() }; if(u.rec) q.ev = []; }
+		send({ type: "rec", rec: u.rec, od: u.od });
+		send({ type: "play", from: sh ? "cont" : "start" });
+		u.shift = false;
+	}
 }
 
 function nvText()
@@ -875,39 +935,49 @@ function nvOf()
 	return null;
 }
 
-// PAD BANK, FULL LEVEL, 16 LEVELS, and the pads
+// the 16 pads on their black plate, lit round the edge: dim with a sample, bright when hit, white
+// selected, red muted. SHIFT + pads 1-4: FULL LEVEL, HALF SEQ, DOUBLE SEQ, the CLICK
+var PAD_SHIFT = ["FULL LEVEL", "HALF SEQ", "DOUBLE SEQ", "CLICK"];
 function drawPads()
 {
-	var u = uiOf(), now = performance.now();
-	// the strip
-	ctx.fillStyle = "#b6b8b8"; ctx.beginPath(); ctx.roundRect( 780, 330, 86, 430, 6 ); ctx.fill();
-	BANKS.forEach(function(b, i){ var x = 808 + (i % 2) * 30, y = 350 + Math.floor( i / 2 ) * 18; led( x, y, S.bank == i ); T( b, x + 10, y, 9, INK, "left" ); });
-	if(key( "bank", 823, 394, 56, 22, "PAD BANK", { tip: "BANK A, B, C, D: 16 PADS EACH" } ).clicked) S.bank = (S.bank + 1) % 4;
-	if(key( "full", 823, 470, 56, 22, "FULL LEVEL", { led: S.full, tip: "EVERY HIT AT FULL VELOCITY" } ).clicked) S.full = !S.full;
-	if(key( "levels", 823, 546, 56, 22, "16 LEVELS", { led: u.levels, tip: "THE SELECTED PAD ON ALL 16 PADS, BY " + S.levels + " (MAIN PAGE)" } ).clicked)
-	{ u.levels = !u.levels; u.levelsPad = S.sel; }
-	if(u.levels) T( padName( u.levelsPad ), 823, 590, 9, INK );
-
-	// the plate, the pads: pad 1 at the bottom left
-	ctx.fillStyle = "#b9bcbc"; ctx.beginPath(); ctx.roundRect( 896, 150, 648, 616, 8 ); ctx.fill();
-	T( "PADS", 1220, 164, 9, DIM );
-	var size = 128, gap = 22, x0 = 896 + (648 - 4 * size - 3 * gap) / 2, y0 = 186;
+	var u = uiOf(), now = performance.now(), sh = u.shift;
+	var size = 108, gap = 18, x0 = 559, y0 = 392;
+	ctx.fillStyle = "#111213"; ctx.beginPath(); ctx.roundRect( x0 - 22, y0 - 22, 4 * size + 3 * gap + 44, 4 * size + 3 * gap + 52, 8 ); ctx.fill();
 	u.padRects = [];
 	for(var n = 0; n < 16; ++n)
 	{
 		var c = n % 4, row = 3 - Math.floor( n / 4 ), x = x0 + c * (size + gap), y = y0 + row * (size + gap);
 		var p = (S.bank << 4) + n, pad = S.pads[p];
-		u.padRects.push([ rackX( x ), rackY( y ), rackX( x + size ) , rackY( y + size ), p ]);
-		T( "PAD " + (n + 1), x, y - 9, 8, INK, "left" );
-		T( (u.levels ? (S.levels == "TUNE" ? "+" + n + " SEMI" : "VEL " + Math.round( (n + 1) / 16 * 127 )) : (pad.name || "")).substr( 0, 14 ), x + size, y - 9, 8, p == S.sel ? RED : DIM, "right" );
+		u.padRects.push([ rackX( x ), rackY( y ), rackX( x + size ), rackY( y + size ), p ]);
 		var r = hot( "pad" + n, x, y, size, size );
-		var f = Math.max( 0, 1 - (now - u.flash[p]) / 180 );
-		ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.roundRect( x + 2, y + 4, size, size, 8 ); ctx.fill();
+		var f = Math.max( 0, 1 - (now - u.flash[p]) / 200 );
+		// the light round the pad
+		var lc = pad.mute ? "255,70,60" : (p == S.sel ? "235,245,255" : "120,230,90");
+		var la = pad.mute ? 0.5 : (pad.s ? 0.35 + f * 0.65 : f * 0.6);
+		if(p == S.sel && !pad.mute) la = Math.max( la, 0.75 );
+		if(la > 0.01)
+		{
+			ctx.fillStyle = "rgba(" + lc + "," + (la * 0.35) + ")"; ctx.beginPath(); ctx.roundRect( x - 7, y - 7, size + 14, size + 14, 10 ); ctx.fill();
+			ctx.fillStyle = "rgba(" + lc + "," + la + ")"; ctx.beginPath(); ctx.roundRect( x - 3, y - 3, size + 6, size + 6, 8 ); ctx.fill();
+		}
 		var g = ctx.createLinearGradient( 0, y, 0, y + size );
-		g.addColorStop( 0, shade( "#8f9193", 0.08 + f * 0.35 ) ); g.addColorStop( 1, shade( "#7f8183", f * 0.3 ) );
-		ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect( x, y + (r.held ? 2 : 0), size, size, 8 ); ctx.fill();
-		if(p == S.sel) { ctx.strokeStyle = "rgba(200,51,43,0.6)"; ctx.lineWidth = 2; ctx.stroke(); }
-		// hit, let go
+		g.addColorStop( 0, shade( "#8e9092", 0.06 + f * 0.25 ) ); g.addColorStop( 1, shade( "#7b7d7f", f * 0.2 ) );
+		ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect( x, y + (r.held ? 2 : 0), size, size, 6 ); ctx.fill();
+		T( String( n + 1 ), x + 4, y + size + 8, 8, "#d8d8d4", "left" );
+		var sub = n < 4 ? PAD_SHIFT[n] : "";
+		if(sub) T( sub, x + size, y + size + 8, 8, sh ? "#ff6a5f" : "#d8d8d4", "right" );
+		var name = u.levels ? (S.levels == "TUNE" ? "+" + n + " SEMI" : "VEL " + Math.round( (n + 1) / 16 * 127 )) : (pad.name || "");
+		T( name.substr( 0, 15 ), x + size / 2, y + size - 12 + (r.held ? 2 : 0), 8, "#3a3b3c" );
+		if(r.clicked && sh && n < 4)
+		{
+			var q = seq();
+			if(n == 0) S.full = !S.full;
+			else if(n == 1 && q.bars > 1) { q.bars = Math.ceil( q.bars / 2 ); q.ev = q.ev.filter(function(e){ return e[0] < q.bars * BAR; }); }
+			else if(n == 2 && q.bars <= 8) { var L = q.bars * BAR; q.ev = q.ev.concat( q.ev.map(function(e){ return [ e[0] + L, e[1], e[2], e[3] ]; }) ); q.bars *= 2; }
+			else if(n == 3) S.click = { "OFF": "REC", "REC": "ON", "ON": "OFF" }[ S.click ];
+			u.shift = false;
+			continue;
+		}
 		if(r.clicked)
 		{
 			var vel = S.full ? 1 : (r.key ? 0.85 : Math.max( 0.3, Math.min( 1, 1 - (ui.y - y) / size * 0.7 ) ));
@@ -919,6 +989,7 @@ function drawPads()
 		}
 		else if(u.down[n] !== undefined && !r.held) { send({ type: "pad", pad: u.down[n], on: false }); delete u.down[n]; }
 	}
+	if(S.full) T( "FULL LEVEL", x0 + 2 * size + 1.5 * gap, y0 - 11, 8, "#7dff8a" );
 }
 
 // files dropped on the pads (or on the panel: the selected pad)
@@ -957,32 +1028,54 @@ function installDrop()
 function draw( mod )
 {
 	M = mod; S = mod.settings; ST = mod.state;
-	var u = uiOf(), w = SIZE[0], h = SIZE[1];
+	var u = uiOf(), w = SIZE[0], h = SIZE[1], st = ST || {};
 	installDrop();
 	takeState();
 	syncSamples( M );
 	u.box = [ rackX( 0 ), rackY( 0 ), rackX( w ), rackY( h ) ];
 	drawCasing( 0, 0, w, h );
 	var g = ctx.createLinearGradient( 0, 0, 0, h );
-	g.addColorStop( 0, "#dfded8" ); g.addColorStop( 1, CASE );
+	g.addColorStop( 0, "#dddcd6" ); g.addColorStop( 1, CASE );
 	ctx.fillStyle = g; ctx.fillRect( 22, 0, w - 44, h );
-	// the name and the print
-	ctx.font = "bold italic 24px Arial, Helvetica, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-	ctx.fillStyle = RED; ctx.fillText( "CRATE", 44, 40 );
-	T( "INTEGRATED RHYTHM MACHINE", 140, 34, 8, INK, "left", false );
-	T( "16 BIT DRUM SAMPLER / MIDI SEQUENCER", 140, 46, 8, INK, "left", false );
-	// the vents and the model name over the pads
-	ctx.fillStyle = "#3b3b3b";
-	for(var gi = 0; gi < 4; ++gi) for(var li = 0; li < 6; ++li) ctx.fillRect( 940 + gi * 150, 26 + li * 8, 110, 3 );
-	ctx.font = "bold 46px Arial, Helvetica, sans-serif"; ctx.textAlign = "right";
-	ctx.strokeStyle = "#555"; ctx.lineWidth = 1.5; ctx.strokeText( "CRATE", 1340, 104 );
-	ctx.fillStyle = "#555"; ctx.fillText( "60", 1420, 104 );
-	ctx.fillStyle = RED; ctx.fillRect( 1238, 128, 182, 2 );
-	T( "SAMPLE PRODUCTION CENTER", 1420, 138, 11, INK, "right" );
 
+	// the black strip
+	ctx.fillStyle = "#161617"; ctx.beginPath(); ctx.roundRect( 30, 6, w - 60, 262, 6 ); ctx.fill();
+	ctx.font = "bold italic 30px Arial, Helvetica, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+	ctx.fillStyle = RED; ctx.fillText( "CRATE", 70, 50 );
+	ctx.fillStyle = "#2a2a2c"; ctx.beginPath(); ctx.arc( 150, 160, 50, 0, Math.PI * 2 ); ctx.fill();
+	S.volume = knob( "volume", 150, 160, 34, S.volume, 0, 1.2, { def: 0.8, format: fmtPct } );
+	T( "MAIN VOLUME", 150, 232, 9, "#e8e8e4" );
+	// the bank letters
+	BANKS.forEach(function(b, i){ T( b, 270 + i * 40, 150, 26, S.bank == i ? "#ffffff" : "#3a3a3c" ); });
+	T( "PAD BANK", 330, 186, 8, "#8a8a86" );
+	led( 300, 222, st.playing, "#5fd36a" );
+	T( "PLAY", 318, 222, 8, "#8a8a86", "left" );
 	drawLcd();
+	// the level LEDs: two columns, green to red
+	var pk = st.out || [0, 0];
+	for(var c = 0; c < 2; ++c)
+		for(var k = 0; k < 5; ++k)
+		{
+			var db = 20 * Math.log10( Math.max( 1e-5, pk[c] ) ), lit = db > -36 + k * 9;
+			var col = k >= 4 ? "#ff3b2f" : (k == 3 ? "#ffa52f" : "#5fd36a");
+			ctx.fillStyle = lit ? col : shade( col, -0.75 );
+			ctx.fillRect( 1074 + c * 24, 222 - k * 34, 16, 24 );
+		}
+	// the speaker and the name over it
+	ctx.font = "bold italic 34px Arial, Helvetica, sans-serif"; ctx.textAlign = "center";
+	ctx.strokeStyle = RED; ctx.lineWidth = 1.5; ctx.strokeText( "CRATE 60", 1320, 40 );
+	ctx.fillStyle = "#0b0b0c"; ctx.beginPath(); ctx.roundRect( 1170, 66, 300, 190, 10 ); ctx.fill();
+	ctx.fillStyle = "#232325";
+	for(var yy = 76; yy < 248; yy += 7) for(var xx = 1180 + ((yy / 7) & 1) * 3.5; xx < 1462; xx += 7) { ctx.beginPath(); ctx.arc( xx, yy, 2, 0, Math.PI * 2 ); ctx.fill(); }
+
 	drawControls();
 	drawPads();
+
+	// the palm rest
+	ctx.fillStyle = "#6c6d6f"; ctx.beginPath(); ctx.roundRect( 470, 918, w - 520, 72, 10 ); ctx.fill();
+	ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect( 480, 922, w - 540, 2 );
+	ctx.font = "bold italic 30px Arial, Helvetica, sans-serif"; ctx.textAlign = "right";
+	ctx.strokeStyle = "#3e3f41"; ctx.lineWidth = 1.5; ctx.strokeText( "CRATE 60", w - 80, 958 );
 	M = null; S = null; ST = null;
 }
 
@@ -991,10 +1084,11 @@ window.CRATE = { uis: uis, samples: SAMPLES }; // for the tests
 WR.registerSynth( "crate", {
 	title: "CRATE 60",
 	description: "CRATE 60: pad sampler and sequencer",
-	about: "A pad sampler and sequencer in the classic beat-machine layout: 64 pads in 4 banks, a factory kit, audio files dropped on the pads, sampling from the back, chops, 16 sequences with swing, note repeat and 16 levels.",
+	about: "A pad sampler and sequencer laid out as a compact modern beat machine: 64 pads in 4 banks, a factory kit, audio files dropped on the pads, sampling from the back, chops, 16 sequences with swing, note repeat and 16 levels.",
 	// keys: the pads first, then the transport
-	key_prio: [["^pad\\d+$", 3], ["^(play|stop|rec|overdub|play_start)$", 2], ["^(repeat|full|bank|levels|tap)$", 1], ["", 0]],
+	key_prio: [["^pad\\d+$", 3], ["^(play|stop|seq_rec|shift)$", 2], ["^(repeat|k_bank|levels|tap|mute|erase)$", 1], ["", 0]],
 	category: "Synths",
+	knob_skin: "greycap",
 	worklet: "devices/crate-worklet.js",
 	jacks: [[]],
 	rear_jacks: [["IN L", "ain", "in_l"], ["IN R", "ain", "in_r"], ["OUT L", "aout", "out_l"], ["OUT R", "aout", "out_r"]],
