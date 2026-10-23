@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -41,6 +41,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
+| `app/devices/crate.js`, `app/devices/crate-worklet.js` | Crate 60, the pad sampler and sequencer (its factory kit is made in `crate.js` and sent to the DSP) |
 | `app/devices/minimad.js`, `app/devices/minimad-worklet.js` | MiniMad, the digital paraphonic synthesizer with a touch keyboard (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `app/devices/midifx.js`, `app/devices/midifx-worklet.js` | MIDI FX, effects on the notes between the keys and the synths (the worklet file is also loaded on the page, for its tables) |
@@ -168,6 +169,24 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Crate 60
+
+A pad sampler and sequencer in the classic beat-machine layout: the LCD with its six soft keys, the mode keys, the DATA wheel, the transport, the NOTE VARIATION slider, and 16 pads in 4 banks (64 pads). Stereo OUT L / R and IN L / R (for sampling) on the back, and MIDI IN: notes 36 to 99 play the pads (bank A from 36), with their velocity.
+
+- **Pads:** click a pad to play it, higher up for a harder hit; the computer keys play them too. **PAD BANK** steps through A, B, C, D. **FULL LEVEL**: every hit at full velocity. **16 LEVELS**: the selected pad on all 16 pads, by velocity (pad 1 softest) or by tune (pad 1 as it is, then a semitone up each pad), chosen on the MAIN page.
+- **Samples:** a factory kit of 20 sounds made in the browser (kicks, snares, clap, rim, hats, ride, crash, toms, cowbell, shaker, a bass note, a minor chord stab, conga, clave, a sub boom and vinyl noise), on banks A and B. **Drop audio files** (WAV, MP3, OGG, FLAC, AIFF...) on a pad to load them (several files: onto the following pads; on the panel but not on a pad: the selected pad). Files and recordings are kept in this browser (IndexedDB); a patch or session only names them, so on another browser those pads stay silent.
+- **The LCD:** the mode keys open its pages. Click a field (or move with CURSOR ▲ ▼) and turn the **DATA** wheel (drag it up or down, or the mouse wheel over it), drag the field itself, or use CURSOR − / +. The F keys do what the bottom line of the page says.
+  - **MAIN:** SEQ (1 to 16), BARS (1 to 16), TEMPO, TIMING CORRECT (OFF, 1/8, 1/8T, 1/16, 1/16T, 1/32: where recorded notes and NOTE REPEAT land), SWING (50 to 75%, the even sixteenths later), CLICK (OFF, while recording, always), 16 LEVELS, NOTE VAR, the selected pad, and the sequence as a strip with the playhead. F keys: SEQ − / +, CLR SEQ, COPY (to the next empty sequence), CLR PAD (the selected pad's notes).
+  - **PROGRAM:** the selected pad: SAMPLE, TUNE (±24 semitones) and FINE, LEVEL, PAN, ATTACK, DECAY (FULL: the whole sample), MODE (ONE SHOT, or NOTE ON: it plays while held), CUTOFF and RESO (a low pass), MUTE GRP (pads of a group cut each other; the hats are in group 1), VEL SENS, REVERSE. F keys: PLAY, PAD − / +, COPY, PASTE, CLEAR.
+  - **SAMPLE:** records the rear IN L / R onto the selected pad: MODE (MONO, STEREO), THRESHOLD (it starts when the input passes it), MAX TIME (1 to 30 s), MONITOR (the input to the outputs), and the input meters (REC GAIN sets the level). F6 arms it, F5 stops; then the TRIM page opens on the new sample.
+  - **TRIM:** the sample's waveform and the part the pad plays: ST and END (or drag in the waveform: the nearest marker follows), REV, and CHOP: F6 cuts the part in 2, 4, 8 or 16 slices onto the selected pad and the ones after it. F4 FULL: the whole sample again.
+  - **LOAD:** the factory sounds and yours. F1 plays one, F6 puts it on the selected pad, F4 deletes one of yours from this browser.
+  - **GRID:** the bank's 16 pads by the 16 sixteenths of a bar: click to add or remove a note. F1 / F2 change the bar, F4 clears it.
+- **Sequencer:** 16 sequences, 96 ticks a beat. **REC** then **PLAY** records the sequence again (what was there is cleared; **UNDO SEQ** brings it back); **OVERDUB** adds to it. REC or OVERDUB while playing punch in. **STOP** (twice: back to the start), **PLAY** (from where it is), **PLAY START**. **LOCATE**: << BAR, < STEP, STEP >, BAR >> (a step is TIMING CORRECT). **NOTE REPEAT**, held with pads, repeats them at TIMING CORRECT (recorded while recording). **ERASE**, held with pads while playing, removes their notes as they pass; pressed when stopped, it clears the selected pad's notes. **TAP TEMPO**: tap the beat.
+- **NOTE VARIATION:** ASSIGN picks what the slider changes on the pads you hit: TUNE (±12 semitones), DECAY, ATTACK or FILTER; recorded notes keep it.
+- **REC GAIN** (the inputs) and **MAIN VOLUME**.
+- Factory patches: Boom Bap, House 124, Lo-Fi Chops.
 
 ## Mount
 
@@ -635,7 +654,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 41 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 54 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
