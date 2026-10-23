@@ -690,8 +690,17 @@ WR.registerSynth( "subharm", {
 	midi_in: "midi_in",
 	// line level, on the back; the STEP inputs are added to the step knobs of each sequencer
 	rear_jacks: [["AUDIO OUT", "aout", "audio"],
-		["SEQ 1 STEP 1", "ain", "seq1_s1"], ["SEQ 1 STEP 2", "ain", "seq1_s2"], ["SEQ 1 STEP 3", "ain", "seq1_s3"], ["SEQ 1 STEP 4", "ain", "seq1_s4"],
-		["SEQ 2 STEP 1", "ain", "seq2_s1"], ["SEQ 2 STEP 2", "ain", "seq2_s2"], ["SEQ 2 STEP 3", "ain", "seq2_s3"], ["SEQ 2 STEP 4", "ain", "seq2_s4"]],
+		["STEP 1", "ain", "seq1_s1"], ["STEP 2", "ain", "seq1_s2"], ["STEP 3", "ain", "seq1_s3"], ["STEP 4", "ain", "seq1_s4"],
+		["STEP 1", "ain", "seq2_s1"], ["STEP 2", "ain", "seq2_s2"], ["STEP 3", "ain", "seq2_s3"], ["STEP 4", "ain", "seq2_s4"]],
+	// the STEP inputs sit behind the step knobs, on two plates away from the audio sockets (code.js: drawRearDevice)
+	rear_layout: {
+		plates: [["SEQUENCER 1 STEP CV", 60, 40, 320, 110], ["SEQUENCER 2 STEP CV", 60, 170, 320, 110]],
+		pos: (function(){
+			var pos = {};
+			[0, 1].forEach(function(i){ [0, 1, 2, 3].forEach(function(k){ pos["seq" + (i + 1) + "_s" + (k + 1)] = [ SEQ_COLS[k], 108 + i * 130 ]; }); });
+			return pos;
+		})()
+	},
 	audio_out: "audio",
 	defaults: defaults,
 	validate: validate,

@@ -2300,6 +2300,8 @@ function jackLabel( id )
 function drawRearDevice( id, x, y, w, h, name )
 {
 	var sockets = rearSockets( id );
+	var mod = rack.settings.modules.find(function(m){ return m.id == id; });
+	var layout = mod && WR.types[ mod.type ].rear_layout; // sockets placed on the back: { plates: [[title, x, y, w, h]], pos: { local jack id: [x, y] } }
 	if(collapsed[id])
 	{
 		drawCasing( x, y, w, DEVICE_COLLAPSED_H );
@@ -2329,9 +2331,23 @@ function drawRearDevice( id, x, y, w, h, name )
 	ctx.strokeRect( x + 26.5, y + 6.5, w - 53, h - 13 );
 	drawScrew( x + w - 36, y + 12 ); drawScrew( x + 36, y + h - 12 ); drawScrew( x + w - 36, y + h - 12 );
 
+	if(layout)
+		layout.plates.forEach(function(p){
+			ctx.fillStyle = "#18181a";
+			ctx.beginPath(); ctx.roundRect( x + p[1], y + p[2], p[3], p[4], 6 ); ctx.fill();
+			drawLabel( p[0], x + p[1] + p[3] * 0.5, y + p[2] + 12, 10, false, DIM_COLOR );
+		});
+	var placed = function(sk){ return layout && layout.pos[ sk[2].substr( sk[2].indexOf(".") + 1 ) ]; };
+	if(layout)
+		sockets.filter(placed).forEach(function(sk){
+			var pp = placed( sk );
+			drawRearSocket( sk[2], x + pp[0], y + pp[1], sk[0], sk[1], name );
+		});
+	sockets = sockets.filter(function(sk){ return !placed( sk ); });
+
 	// ventilation slots on the left
 	var vx = x + 64, vrows = Math.min( 8, Math.floor( (h - 30) / 16 ) );
-	var vcols = Math.min( 10, Math.floor( (w * 0.28) / 26 ) );
+	var vcols = layout ? 0 : Math.min( 10, Math.floor( (w * 0.28) / 26 ) );
 	var vy = y + (h - vrows * 16) * 0.5 + 3;
 	ctx.fillStyle = "#121214";
 	for(var r = 0; r < vrows; ++r)
