@@ -137,4 +137,4 @@ The app, README and home page use plain, short, factual sentences: what a contro
 
 Synths: SUBHARM (polyrhythmic), DRAM (analog percussion), BROTHER-32 (semi-modular with a 32 step sequencer), MAZE (generative), MYSTIC (wave scanning poly), MOUNT (8 voice wavetable poly), PARA D (4 oscillator paraphonic), LLM DRAM (80s drum machine), LUNAR 21 (drone machine), MINIMAD (digital paraphonic, touch keyboard, mod matrix), CUSTOM SYNTH (Synth Editor).
 Sequencing and modulation: GRID 32 (32×32 note matrix), MIDI FX (timing, harmony, scale, arp, echo on the notes), dual LFO, the song sequencer, the KEYS device (on-screen keys, QWERTY piano, MIDI).
-Mixing and effects: mixer, compressor (with scope), reverb, delay, UNIVERSE (granular looper), COSMOS (12 algorithm reverb), HYPER (distortion / bit crusher), TAPE (wow, flutter, saturation, hiss, tape stop), REROUTE (front to back).
+Mixing and effects: mixer, compressor (with scope), reverb, delay, UNIVERSE (granular looper), COSMOS (12 algorithm reverb), HYPER (distortion / bit crusher), PRISM (5 band EQ with a spectrum display), TAPE (wow, flutter, saturation, hiss, tape stop), REROUTE (front to back).

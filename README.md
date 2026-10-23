@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper) and a tape machine (Tape), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -35,6 +35,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/delay.js`, `app/devices/delay-worklet.js` | the stereo / ping-pong delay |
 | `app/devices/universe.js`, `app/devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `app/devices/hyper.js`, `app/devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
+| `app/devices/eq.js`, `app/devices/eq-worklet.js` | Prism, the five band equalizer with a spectrum display |
 | `app/devices/tape.js`, `app/devices/tape-worklet.js` | Tape, the tape machine (wow, flutter, saturation, hiss) |
 | `app/devices/cosmos.js`, `app/devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
 | `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
@@ -99,7 +100,7 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper, Tape, Cosmos) sit side by side when two are next to each other.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper, Tape, Cosmos, Prism) sit side by side when two are next to each other.
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
@@ -112,11 +113,11 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The pictures are in `app/previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `app/index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A new Universe, Hyper, Tape or Cosmos goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
+  - A new Universe, Hyper, Tape, Cosmos or Prism goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
-- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper, Tape) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper, Tape, Prism) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
@@ -374,6 +375,16 @@ A multi-algorithm stereo reverb pedal. It is a half-width device with stereo IN 
 - **TEMPO:** the DELAY knobs in note values of the tempo tapped on TAP.
 - **Footswitches:** ACTIVE (bypass with the tails ringing on), HOTSWITCH (freeze the reverb) and TAP.
 - **Algorithms:** approximations of classic studio reverbs. The HotSwitch is a freeze here, not a programmable set of knob positions. No expression pedal or MIDI.
+
+## Prism
+
+A stereo five band equalizer (half width, stereo IN / OUT on the back) with a spectrum display.
+
+- **Bands:** LOW (a shelf), LO MID, MID and HI MID (bells with Q, 0.2 to 10) and HIGH (a shelf). Each has FREQ (20 Hz to 20 kHz) and GAIN (±18 dB); its name switches it on and off.
+- **LOW CUT** (off, or a 12 dB/octave high pass up to 1 kHz) and **HIGH CUT** (off, or a 12 dB/octave low pass down to 1 kHz).
+- **OUTPUT** (-24 to +12 dB) and **ON** (off: dry through).
+- **Display:** the spectrum of the output (28 bars, a third of an octave apart, 25 Hz to 16 kHz), the curve of the EQ and a numbered point per band. Drag a point to set its frequency and gain; the wheel over it sets the Q (when the wheel turns knobs: the option, or Ctrl); double-click it to bring it back to 0 dB.
+- **Starting points:** FLAT, WARM, BRIGHT, SCOOP and RADIO.
 
 ## Hyper
 
