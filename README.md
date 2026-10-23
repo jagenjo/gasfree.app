@@ -658,7 +658,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
 ## Controls
 
 - Drag knobs vertically; hold Shift for fine control. The mouse wheel also works, and double-clicking a knob resets it.
-- Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
+- Drag from a jack to patch. Drag a cable off an input to move or remove it. Shift + drag a jack that has cables to move them all (both ends work, outputs too) to another jack of the same kind; dropped elsewhere, they stay. Double-click or right-click a jack to unplug it.
 - Keys: `Space` play/stop (every synth); the other keys press the buttons of the device in the middle of the screen (hold `Shift` to see them, `` ` `` switches banks).
 
 ## Design notes

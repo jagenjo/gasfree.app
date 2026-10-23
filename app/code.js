@@ -38,7 +38,7 @@ var ui = {
 };
 var tooltips = [];
 var jacks = {};          // jack id -> { x, y, type, label }, in rack coordinates
-var cable_drag = null;   // { from: jack id, type: "out"|"in", color }
+var cable_drag = null;   // { from: jack id, type: "out"|"in", color }, or moving (Shift): { from: jack id, type, move: [the patches unplugged from it] }
 var next_color = 0;
 var show_wires = true;
 try { show_wires = localStorage.getItem("SUBHARM_wires") != "hidden"; } catch(err) {}
@@ -1313,8 +1313,18 @@ function fader( id, x, y, h, value, o )
 // ---------------------------------------------------------------------------
 // patch bay
 
+// a cable drag stopped halfway: cables being moved (Shift) go back where they were
+function cancelCableDrag()
+{
+	if(cable_drag && cable_drag.move)
+		rack.settings.patches = rack.settings.patches.concat( cable_drag.move );
+	cable_drag = null;
+}
+
 function jackCompatible( drag, j )
 {
+	if(drag.move) // moving the cables of a jack: to another jack of its kind
+		return j.type == drag.type;
 	return (drag.type == "out" && j.type == "in") || (drag.type == "in" && j.type == "out") ||
 		(drag.type == "aout" && j.type == "ain") || (drag.type == "ain" && j.type == "aout") ||
 		(drag.type == "midiout" && j.type == "midiin") || (drag.type == "midiin" && j.type == "midiout");
@@ -1407,8 +1417,15 @@ function updateCables()
 		{
 			ui.active = "jack";
 			var j = jacks[id];
+			var plugged = patches.filter(function(p){ return p[0] == id || p[1] == id; });
 			if(ui.dbl)
 				rack.disconnect( id );
+			else if(ui.shift && plugged.length)
+			{
+				// Shift: the cables plugged here move, all of them, to the jack they are dropped on
+				rack.settings.patches = patches.filter(function(p){ return plugged.indexOf( p ) < 0; });
+				cable_drag = { from: id, type: j.type, move: plugged };
+			}
 			else if(j.type == "in" || j.type == "midiin" || j.type == "ain")
 			{
 				// grab the cable plugged here (the newest one, on an audio input with several), or start a new one
@@ -1425,6 +1442,17 @@ function updateCables()
 			else
 				cable_drag = { from: id, type: j.type, color: next_color++ % CABLE_COLORS.length };
 		}
+	}
+	if(cable_drag && cable_drag.move && !ui.down)
+	{
+		var target = jackAt( ui.x, ui.y ), d = cable_drag;
+		cable_drag = null;
+		if(!target || target == d.from || !jackCompatible( d, jacks[target] ))
+			target = d.from; // dropped elsewhere: they go back
+		d.move.forEach(function(p){
+			if(p[0] == d.from) rack.connect( target, p[1], p[2] );
+			else rack.connect( p[0], target, p[2] );
+		});
 	}
 	if(cable_drag && !ui.down)
 	{
@@ -1480,7 +1508,12 @@ function drawCables()
 		if(a && b)
 			drawCable( a.x, a.y, b.x, b.y, CABLE_COLORS[ p[2] % CABLE_COLORS.length ], 0.92, !show_wires );
 	});
-	if(cable_drag)
+	if(cable_drag && cable_drag.move)
+		cable_drag.move.forEach(function(p){
+			var a = jacks[ p[0] == cable_drag.from ? p[1] : p[0] ];
+			if(a) drawCable( a.x, a.y, ui.x, ui.y, CABLE_COLORS[ p[2] % CABLE_COLORS.length ], 0.8 );
+		});
+	else if(cable_drag)
 	{
 		var a = jacks[ cable_drag.from ];
 		drawCable( a.x, a.y, ui.x, ui.y, CABLE_COLORS[ cable_drag.color ], 0.8 );
@@ -2996,7 +3029,7 @@ function updateToolbarFrame()
 function setRear( rear )
 {
 	show_rear = rear;
-	cable_drag = null;
+	cancelCableDrag();
 	$("rear").textContent = rear ? "Front (Tab)" : "Rear (Tab)";
 	$("rear").classList.toggle( "on", rear );
 	setStatus( rear ? "Rear view: the audio connections between the devices (Tab for the front)" : "Front view" );
@@ -3026,7 +3059,7 @@ function setLayout( name )
 	PANEL_W = LAYOUTS[name].w;
 	updatePanelHeight();
 	jacks = {};
-	cable_drag = null;
+	cancelCableDrag();
 	document.querySelectorAll('input[name="opt-layout"]').forEach(function(r){ r.checked = r.value == name; });
 	try { localStorage.setItem( "SUBHARM_layout", name ); } catch(err) {}
 }
