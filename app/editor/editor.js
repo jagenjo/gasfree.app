@@ -174,7 +174,7 @@ function open( mid )
 {
 	if(ed.suppress) return;
 	build();
-	ed.mid = mid; ed.sel = null; ed.fitted = false;
+	ed.mid = mid; ed.sel = null; ed.fitted = false; ed.pv = { z: 1, x: 0, y: 0 };
 	if(!mod()) return;
 	el.root.hidden = false;
 	refreshTop();
@@ -207,15 +207,16 @@ function setView( v )
 {
 	if(ed.view != v && ed.sel && ed.sel.type == "item") { var x = byId( ed.sel.id ); if(x && v != "inside" && (v == "back") != isBackItem( x )) ed.sel = null; }
 	ed.view = v;
+	ed.pv = { z: 1, x: 0, y: 0 }; // the panels start fitted again
 	el.top.querySelectorAll( "[data-view]" ).forEach(function(b){ b.classList.toggle( "on", b.getAttribute( "data-view" ) == v ); });
 	el.front.hidden = v == "inside";
 	el.inside.hidden = v != "inside";
 	renderPalette();
 	renderProps();
 	if(v == "inside") { renderInside(); if(!ed.fitted) { fitInside(); ed.fitted = true; } }
-	hint( v == "front" ? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, rectangle, slider, button, LED bar or meter to resize it, the ends of a line to change it. Delete removes; arrows nudge; Ctrl+D duplicates. Play the keys to hear the synth."
-		: v == "back" ? "The back: MAIN OUT L / R and MIDI IN are always there (move them where you like); add AUDIO IN and OUT sockets, labels, rectangles, lines, vents. Tab in the rack shows it."
-		: "Drag from an output (right) to an input (left) to wire them; drag a wired input to move or remove its wire. Drag a node by its title; drag the background to pan, the wheel zooms. A knob takes the range of the first input it is wired to." );
+	hint( v == "front" ? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, rectangle, slider, button, LED bar or meter to resize it, the ends of a line to change it. Delete removes; arrows nudge; Ctrl+D duplicates. The wheel zooms and the middle button drags the view. Play the keys to hear the synth."
+		: v == "back" ? "The back: MAIN OUT L / R and MIDI IN are always there (move them where you like); add AUDIO IN and OUT sockets, labels, rectangles, lines, vents. Tab in the rack shows it. The wheel zooms and the middle button drags the view."
+		: "Drag from an output (right) to an input (left) to wire them; drag a wired input to move or remove its wire. Drag a node by its title; drag the background (or use the middle button) to pan, the wheel zooms. A knob takes the range of the first input it is wired to." );
 }
 
 // ---------------------------------------------------------------------------
@@ -440,8 +441,10 @@ function renderPanel()
 	var m = mod(), d = def(), size = d.size( layout, m.settings ), list = panelList();
 	var ext = [ size[0], size[1] ];
 	list.forEach(function(it){ var b = CS.box( it ); ext[0] = Math.max( ext[0], b.x + b.w + 10 ); ext[1] = Math.max( ext[1], b.y + b.h + 10 ); });
-	var k = Math.min( (W - 60) / ext[0], (H - 60) / ext[1], 1.5 ), ox = (W - ext[0] * k) / 2, oy = (H - ext[1] * k) / 2;
-	ed.fit = { k: k, ox: ox, oy: oy, w: size[0], h: size[1] };
+	var pv = ed.pv = ed.pv || { z: 1, x: 0, y: 0 }; // the wheel zooms and the middle button pans, on top of the fitted view
+	var k0 = Math.min( (W - 60) / ext[0], (H - 60) / ext[1], 1.5 ), k = k0 * pv.z;
+	var ox0 = (W - ext[0] * k0) / 2, oy0 = (H - ext[1] * k0) / 2, ox = ox0 + pv.x, oy = oy0 + pv.y;
+	ed.fit = { k: k, k0: k0, ox0: ox0, oy0: oy0, ox: ox, oy: oy, w: size[0], h: size[1] };
 	c.setTransform( 1, 0, 0, 1, 0, 0 );
 	c.clearRect( 0, 0, cv.width, cv.height );
 	c.setTransform( dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy );
@@ -504,6 +507,14 @@ function panelEvents()
 	var cv = el.front;
 	cv.addEventListener("pointerdown", function(e){
 		if(!ed.fit) return;
+		if(e.button === 1) // middle button: drag the view
+		{
+			e.preventDefault();
+			ed.drag = { mode: "view", sx: e.clientX, sy: e.clientY, x: ed.pv.x, y: ed.pv.y };
+			cv.style.cursor = "grabbing";
+			cv.setPointerCapture( e.pointerId );
+			return;
+		}
 		var p = toPanel( e ), sel = ed.sel && ed.sel.type == "item" ? byId( ed.sel.id ) : null, hs = 12 / ed.fit.k;
 		if(sel && panelList().indexOf( sel ) >= 0)
 		{
@@ -527,7 +538,8 @@ function panelEvents()
 	cv.addEventListener("pointermove", function(e){
 		if(!ed.fit) return;
 		var p = toPanel( e ), d = ed.drag, f = ed.fit;
-		if(d && d.mode == "move")
+		if(d && d.mode == "view") { ed.pv.x = d.x + e.clientX - d.sx; ed.pv.y = d.y + e.clientY - d.sy; }
+		else if(d && d.mode == "move")
 		{
 			var it = d.it;
 			it.x = Math.max( 0, Math.min( f.w, snap( d.x0 + p.x - d.px ) ) );
@@ -552,10 +564,19 @@ function panelEvents()
 			cv.style.cursor = onHandle ? "nwse-resize" : (ed.hover ? "move" : "default");
 		}
 	});
-	var up = function(){ if(ed.drag) { ed.drag = null; renderProps(); } };
+	var up = function(){ if(ed.drag) { var v = ed.drag.mode == "view"; ed.drag = null; if(v) cv.style.cursor = "default"; else renderProps(); } };
 	cv.addEventListener("pointerup", up);
 	cv.addEventListener("pointercancel", up);
 	cv.addEventListener("pointerleave", function(){ ed.hover = null; });
+	cv.addEventListener("auxclick", function(e){ e.preventDefault(); });
+	cv.addEventListener("wheel", function(e){ // zoom around the mouse
+		e.preventDefault();
+		var f = ed.fit, pv = ed.pv, r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+		if(!f) return;
+		var z = Math.max( 0.3, Math.min( 8, pv.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1) ) ), k = f.k0 * z;
+		var px = (mx - f.ox) / f.k, py = (my - f.oy) / f.k; // the panel point under the mouse stays there
+		pv.z = z; pv.x = mx - px * k - f.ox0; pv.y = my - py * k - f.oy0;
+	}, { passive: false });
 }
 
 // ---------------------------------------------------------------------------
@@ -729,6 +750,14 @@ function insideEvents()
 	var ins = el.inside;
 	ins.addEventListener("pointerdown", function(e){
 		var t = e.target;
+		if(e.button === 1) // middle button: drag the view, over anything
+		{
+			e.preventDefault();
+			ed.drag = { mode: "pan", sx: e.clientX, sy: e.clientY, px: ed.pan.x, py: ed.pan.y };
+			ins.classList.add( "panning" );
+			ins.setPointerCapture( e.pointerId );
+			return;
+		}
 		var port = t.closest ? t.closest( ".se-port" ) : null, head = t.closest ? t.closest( "[data-drag]" ) : null, node = t.closest ? t.closest( ".se-node" ) : null;
 		if(t.getAttribute && t.getAttribute( "data-wire" ) !== null) { select({ type: "wire", index: +t.getAttribute( "data-wire" ) }); drawWires(); return; }
 		if(port)
@@ -798,6 +827,7 @@ function insideEvents()
 	};
 	ins.addEventListener("pointerup", up);
 	ins.addEventListener("pointercancel", up);
+	ins.addEventListener("auxclick", function(e){ e.preventDefault(); });
 	ins.addEventListener("dblclick", function(e){
 		var t = e.target;
 		if(t.getAttribute && t.getAttribute( "data-wire" ) !== null) { S().wires.splice( +t.getAttribute( "data-wire" ), 1 ); ed.sel = null; renderInside(); renderProps(); }

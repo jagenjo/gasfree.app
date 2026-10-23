@@ -76,7 +76,7 @@ Build your own synth: design its front panel, then wire what is behind it.
   - **Processors:** FILTER (low, band and high pass), VCA, MIXER, DRIVE, DELAY.
   - **Utilities:** MATH (A × B + C).
   - **Outputs:** AUDIO OUT, to the rack's audio.
-- **Wiring:** drag from an output (right side) to an input (left side). An input takes one wire; drag a wired input to move its wire or drop it to remove it. Double-click a wire to remove it. Drag the background to pan; the wheel zooms.
+- **Wiring:** drag from an output (right side) to an input (left side). An input takes one wire; drag a wired input to move its wire or drop it to remove it. Double-click a wire to remove it. Drag the background to pan; the wheel zooms. On the FRONT and BACK PANEL views the wheel zooms around the mouse too, and the middle button drags the view (on all three views, over anything); switching view fits the panel again.
   - An input with no wire uses its own value, set in the properties of the selected module.
   - A knob or slider takes the range of the first input it is wired to (CUTOFF, ATTACK...), starting at that input's default. Untick *Automatic range* to set your own.
 - **Signals:** audio is −1..1, gates 0 or 1, envelopes 0..1, pitch in octaves from C4. Jacks convert to the rack's volts: CV and audio ±5 V, pitch 1 V/oct, gates 5 V. Up to 8 jacks in and 8 out on the front, 4 audio ins and 4 audio outs on the back (line level, −1..1).
