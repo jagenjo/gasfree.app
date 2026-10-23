@@ -56,6 +56,7 @@ var PREVIEW_TYPE = (function(){ var m = /[?&]preview=([a-z0-9_]+)/.exec( typeof 
 window.PREVIEW_MODE = !!PREVIEW_TYPE;
 // knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
 var knob_skin = null;
+var knob_ring = null; // the options of the LED ring knob being drawn (the editor's ring knob: its LED colour and count)
 var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING", greycap: "GREY CAP", flat: "FLAT" };
 // the cap colour for the FLAT knobs (a panel with coloured knobs sets it per knob)
 var knob_tint = null;
@@ -664,13 +665,15 @@ function knob( id, cx, cy, r, value, min, max, o )
 
 	var style = o.style || "ticks";
 	var steps = o.step ? Math.round( (max - min) / o.step ) + 1 : 0;
-	var skin = knob_skin || (layout == "classic" ? "classic" : "aluminium");
+	var skin = o.ring ? "ledring" : knob_skin || (layout == "classic" ? "classic" : "aluminium"); // o.ring: this knob only (the editor's LED ring knob)
 	if(skin != "classic" && skin != "aluminium")
 	{
 		var tk = o.ticks || steps || (style == "ring" ? 11 : 31);
 		if(skin != "ledring" && !o.noScale) // the LED ring is its own scale; noScale: no printed scale
 			drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
+		knob_ring = o.ring ? o : null;
 		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id, o.bipolar );
+		knob_ring = null;
 		if(o.label)
 			drawLabel( o.label, cx, cy - (style == "small" ? r + 15 : (style == "ring" ? r * 1.2 + 16 : r * 1.12 + 18)), o.labelSize || 11 );
 	}
@@ -825,7 +828,7 @@ function drawSkinKnob( skin, cx, cy, r, n, highlight, bipolar )
 	{
 		// white LEDs around the knob, lit up to the value (from the centre when bipolar), and a
 		// machined silver knob
-		var leds = 15, rr = r + 6;
+		var leds = knob_ring && knob_ring.ringLeds || 15, rr = r + 6, lc = knob_ring && knob_ring.ringColor || "#f4f8ff";
 		for(i = 0; i < leds; ++i)
 		{
 			var t = i / (leds - 1), b = KNOB_A0 + t * KNOB_SWEEP;
@@ -833,10 +836,11 @@ function drawSkinKnob( skin, cx, cy, r, n, highlight, bipolar )
 			var lx = cx + Math.cos(b) * rr, ly = cy + Math.sin(b) * rr;
 			if(on)
 			{
-				ctx.fillStyle = "rgba(220,235,255,0.25)";
+				ctx.globalAlpha = 0.25; ctx.fillStyle = lc;
 				ctx.beginPath(); ctx.arc( lx, ly, 3.6, 0, Math.PI * 2 ); ctx.fill();
+				ctx.globalAlpha = 1;
 			}
-			ctx.fillStyle = on ? "#f4f8ff" : "#2a2b2d";
+			ctx.fillStyle = on ? lc : "#2a2b2d";
 			ctx.beginPath(); ctx.arc( lx, ly, 1.7, 0, Math.PI * 2 ); ctx.fill();
 		}
 		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r );

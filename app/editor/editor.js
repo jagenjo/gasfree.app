@@ -23,6 +23,7 @@ var FRONT_ITEMS = [
 	["knob:s", "KNOB SMALL", "", { kind: "knob", size: "s", label: "KNOB" }],
 	["knob:m", "KNOB", "", { kind: "knob", size: "m", label: "KNOB" }],
 	["knob:l", "KNOB LARGE", "", { kind: "knob", size: "l", label: "KNOB" }],
+	["knob:ring", "KNOB LED RING", "", { kind: "knob", size: "m", label: "KNOB", ring: true }],
 	["knob:xl", "KNOB XL", "", { kind: "knob", size: "xl", label: "KNOB" }],
 	["knob:h", "KNOB HUGE", "", { kind: "knob", size: "h", label: "KNOB" }],
 	["slider", "SLIDER", "", { kind: "slider", h: 60, label: "SLIDER" }],
@@ -339,7 +340,7 @@ function add( what, at, exact )
 	var count = list.filter(function(i){ return i.kind == kind; }).length + 1;
 	switch(kind)
 	{
-		case "knob": it.size = sub || "m"; it.label = "KNOB " + count; break;
+		case "knob": it.size = sub == "ring" ? "m" : sub || "m"; if(sub == "ring") it.ring = true; it.label = "KNOB " + count; break;
 		case "slider": it.h = 120; it.label = "SLIDER " + count; break;
 		case "button": it.w = 70; it.h = 26; it.label = "BUTTON"; break;
 		case "toggle": it.w = 70; it.h = 26; it.label = "SWITCH"; break;
@@ -851,6 +852,12 @@ function renderProps()
 		{
 			case "knob":
 				p.appendChild( field( "Size", selIn( x.size, [["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "XL"], ["h", "Huge"]], function(v){ x.size = v; } ) ) );
+				p.appendChild( field( "LED ring", selIn( x.ring ? "on" : "off", [["off", "No"], ["on", "LEDs around it, lit as it turns"]], function(v){ x.ring = v == "on"; renderProps(); } ) ) );
+				if(x.ring)
+				{
+					p.appendChild( field( "LED colour", selIn( x.ring_color || "white", Object.keys( CS.LED_COLORS ).map(function(k){ return [ k, k ]; }), function(v){ x.ring_color = v; } ) ) );
+					p.appendChild( field( "LEDs", numIn( x.ring_leds || 15, function(v){ x.ring_leds = Math.max( 3, Math.min( 41, Math.round( v ) ) ); }, 3, 41 ) ) );
+				}
 				rangeFields( p, x );
 				scaleFields( p, x );
 				break;

@@ -197,7 +197,8 @@ function drawItem( it, col )
 			if(steps) dn = Math.round( dn * (steps - 1) ) / (steps - 1);
 			try {
 				var v = knob( it.id, it.x, it.y, KNOB_R[ it.size ] || 20, n0, 0, 1, { label: it.label, def: dn, style: "small", labelSize: it.size == "h" || it.size == "xl" ? 13 : 11,
-					bipolar: r.min < 0 && r.max > 0, ticks: it.ticks > 1 ? Math.round( it.ticks ) : undefined, noScale: it.ticks === 0, step: steps ? 1 / (steps - 1) : undefined,
+					bipolar: r.min < 0 && r.max > 0, ticks: it.ticks > 1 ? Math.round( it.ticks ) : undefined, noScale: it.ticks === 0, ring: it.ring, ringColor: it.ring ? LED_COLORS[ it.ring_color ] || LED_COLORS.white : undefined,
+					ringLeds: it.ring_leds > 1 ? Math.round( it.ring_leds ) : undefined, step: steps ? 1 / (steps - 1) : undefined,
 					format: function(n){ return (it.label ? it.label + " " : "") + CAT.fmt( r, CAT.fromN( r, n ) ); } } );
 			}
 			finally { KNOB_A0 = keepA[0]; KNOB_SWEEP = keepA[1]; }

@@ -59,7 +59,8 @@ Build your own synth: design its front panel, then wire what is behind it.
 
 - **Start:** ADD DEVICE › Custom › CUSTOM SYNTH adds one and opens the editor. The ✎ button on a custom synth's left ear opens it again. It starts as an example synth (MIDI, oscillator, filter, envelope, VCA); **Empty panel** starts from scratch.
 - **The panel:** choose its width (full or half rack), height (1 to 5 units), colour, knob style and wooden sides.
-- **FRONT PANEL:** the palette shows each item as it will look (in the panel's colours and knob style): knobs (small, medium, large, XL and huge), sliders, buttons (a gate while held), switches, LEDs, LED bars, panel meters, jacks in and out, labels, sections, rectangles, lines and screws.
+- **FRONT PANEL:** the palette shows each item as it will look (in the panel's colours and knob style): knobs (small, medium, large, XL and huge, and a LED ring knob), sliders, buttons (a gate while held), switches, LEDs, LED bars, panel meters, jacks in and out, labels, sections, rectangles, lines and screws.
+  - **LED ring knob:** a knob with LEDs around it that light up to its value (from the centre when its range crosses zero). Any knob can switch it on (LED ring in its properties): LED colour and 3 to 41 LEDs.
   - **LED bar** (horizontal or vertical): lights as many LEDs as the level of its input, like the level meter of a mixer, and falls back slowly. 2 to 48 LEDs, green, amber and red or one colour, on a linear scale (0..1) or in decibels (-48..0 dB).
   - **Panel meter:** an analog meter with a needle. On 0..1 (0 to 10) it shows the size of its input (audio reads as its level); on centre zero it shows its value from -1 to 1 (a CV, an LFO). Cream or black face. Wire a JACK IN to it inside to measure what comes into a socket.
   - Drag one onto the panel: it follows the mouse at its real size and lands where it is dropped. A click adds it in a free place.
