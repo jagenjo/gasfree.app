@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261024d"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261024e"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -1352,6 +1352,10 @@ WRContext.prototype.onMIDIMessage = function( data )
 		this.post({ type: "modwheel", channel: channel, value: data[2] / 127 });
 	else if(cmd == 0xD0) // channel aftertouch, 0..1
 		this.post({ type: "pressure", channel: channel, value: data[1] / 127 });
+	else if(cmd == 0xA0) // polyphonic aftertouch: a note's pressure, 0..1
+		this.post({ type: "polypressure", channel: channel, note: data[1], value: data[2] / 127 });
+	else if(cmd == 0xB0 && data[1] == 64) // the sustain pedal
+		this.post({ type: "sustain", channel: channel, value: data[2] >= 64 });
 }
 
 // ---- keys device: every note source (MIDI device, on-screen keys, computer keyboard) ends here ----

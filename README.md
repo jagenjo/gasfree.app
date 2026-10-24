@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a six voice analog polysynth (Mesiah-6), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a six voice analog polysynth (Mesiah-6), an eight voice polysynth with two channels a voice (CSS 90), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -42,6 +42,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `app/devices/mesiah6.js`, `app/devices/mesiah6-worklet.js` | Mesiah-6, the six voice analog polysynth |
+| `app/devices/css90.js`, `app/devices/css90-worklet.js` | CSS 90, the eight voice polysynth with two channels a voice |
 | `app/devices/crate.js`, `app/devices/crate-worklet.js` | Crate 60, the pad sampler and sequencer (its factory kit is made in `crate.js` and sent to the DSP) |
 | `app/devices/minimad.js`, `app/devices/minimad-worklet.js` | MiniMad, the digital paraphonic synthesizer with a touch keyboard (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
@@ -248,6 +249,32 @@ A six voice analog polysynth, laid out as the classic one it follows: a performa
 - **Built-in programs:** 000 Poly Brass, 001 Sync Lead, 002 String Machine, 003 Fat Bass, 004 PWM Pad, 005 FM Bell, 006 Gated Chords, 007 Spring Keys, 008 Arp Pulse, 009 Seq Bass (with a sequence), 010 Hollow Flute, 011 Noise Sweep, 012 Chord Stab (chord memory), 013 Ring Bells, 014 Low Freq Drone, 015 Hall Pad.
 - **Factory patches:** *Poly Brass*, *String Machine*, *Seq Bass* and *Chord Stab*.
 - **Simplified:** one bank of 16 built-in programs and 10 user programs instead of 1000; the oscillators are digital models (band limited saw and pulse); no poly chain, alternative tunings or MIDI out of the arpeggiator and sequencer.
+
+## CSS 90
+
+An eight voice polysynth laid out as the classic one it follows: two rows of sliders with coloured caps, one for each channel, the control row under them, the row of coloured preset buttons and the ribbon. Every voice plays two complete channels at once, each with its oscillator, two filters, their envelope, a sine and an amplifier. Play it from the keys, a MIDI device or the song sequencer. OUT L / OUT R are on the back.
+
+- **CHANNEL I and CHANNEL II** (one row each, the same controls):
+  - **FEET:** 16', 8' or 4' (an octave down, as played, an octave up).
+  - **VCO:** PWM SPEED (the pulse width's own modulation, 0.1-10 Hz; at the bottom: off), PW, SAW and SQUARE (on / off, both can sound), NOISE.
+  - **VCF:** a 12 dB HIGH-PASS (CUTOFF, RES; at the bottom: off) then a 12 dB LOW-PASS (CUTOFF, RES). Their ENVELOPE moves both: it starts at IL (initial level), goes to AL (attack level) in A, back to the sliders' cutoff in D, stays there while the key is down, and returns to IL in R. IL and AL are bipolar.
+  - **SINE:** a sine at the oscillator's pitch that skips the filters and goes straight to the VCA.
+  - **VCA:** LEVEL and A, D, S, R (2 ms to 10 s).
+  - **TOUCH RESPONSE:** INITIAL (velocity) and AFTER (aftertouch) to BRILL (both filters) and LEVEL. Aftertouch is per note with polyphonic aftertouch, else the channel pressure for all notes.
+- **On the right:** VOLUME, BALANCE (channel I and II), the voice LEDs and the CV jacks.
+- **SUB OSCILLATOR:** FUNCTION (SINE, SQUARE, SAW UP, SAW DOWN, RANDOM, NOISE), SPEED (0.1-50 Hz), FADE (it fades in over up to 4 s from each note), and its depth to VCO (vibrato; the mod wheel adds to it), VCF and VCA.
+- **AFTER TOUCH:** PITCH (bipolar, up to 2 semitones) and VIBRATO (more sub oscillator on the pitch).
+- **KEYBOARD CONTROL:** BRILLIANCE and LEVEL, LOW and HIGH (bipolar): how the cutoff and the level change towards the low and the high end of the keys.
+- **RING MODULATOR:** DEPTH (at the bottom: off), SPEED (0.5 Hz to 2 kHz), ATTACK (the depth rises from each note) and DECAY (then falls; at the top it stays).
+- **CHORUS / TREMOLO:** OFF, CHORUS (stereo) or TREMOLO (the sides in turn), SPEED and DEPTH.
+- **PORTAMENTO:** PORTA (a glide) or GLISS (in semitones), TIME (at the bottom: off).
+- **DETUNE** (channel II, up to 30 cents), **BRILLIANCE** (both filters of both channels, ±3 octaves), **RESONANCE** (added to all the filters), **TUNE** (±50 cents).
+- **Preset voices:** 22 coloured buttons load a sound into the sliders: STRINGS 1-3, BRASS 1-3, FLUTE, ELEC PIANO, BASS, CLAVICHORD, HARPSICHORD, ORGAN 1-2, GUITAR 1-2, FUNKY 1-5, BELLS, SOLO. **STORE**, then **MEMORY 1-4**, keeps the panel there (with the rack); MEMORY 1-4 load it back.
+- **Ribbon:** press anywhere on it and slide left or right: the pitch bends up to an octave each way. Let go: back to the note.
+- **Sustain:** the sustain pedal (MIDI CC 64) or a gate in SUS holds the notes.
+- **CV jacks:** inputs BRILL (the cutoff of all the filters, 1 V/oct), VOL (expression, 0-5 V) and SUS; outputs PITCH, GATE, SUB (the sub oscillator) and RIBBON.
+- **Factory patches:** *Swelling Brass*, *Ring Bells*, *Ribbon Solo* and *String Ensemble*.
+- **Simplified:** the presets load into the sliders (the panel always shows what plays); the oscillators are digital models; per note aftertouch needs a controller that sends it; no knee lever or foot pedals other than sustain.
 
 ## Grid 32
 
@@ -671,7 +698,7 @@ MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, a **M
 - **Keys:** the same selector under the keys' MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
 - **A device's MIDI OUT** (the MIDI FX): its notes go only to the devices cabled from it, whatever channel they listen to. A device fed only that way doesn't hear the keys. One MIDI OUT can feed several devices; a MIDI IN takes one cable.
 - **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
-- **Controllers:** pitch bend, the mod wheel (CC 1) and channel aftertouch from a MIDI device reach the synths on their channel, and pass through the MIDI FX. The MYSTIC uses the mod wheel and aftertouch as sources of its mod matrix; the other devices ignore them.
+- **Controllers:** pitch bend, the mod wheel (CC 1), channel aftertouch, polyphonic aftertouch and the sustain pedal (CC 64) from a MIDI device reach the synths on their channel, and pass through the MIDI FX. The MYSTIC uses the mod wheel and aftertouch as sources of its mod matrix, the MESIAH-6 uses the mod wheel and channel aftertouch, the CSS 90 all of them; the other devices ignore them.
 
 ## Keys device and MIDI
 
@@ -698,7 +725,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 60 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 64 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, CSS 90, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.

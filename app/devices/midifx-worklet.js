@@ -81,7 +81,7 @@ class MidiFxDSP {
 	message(m) {
 		switch (m.type) {
 			case "note": if (!this.sending) this.input(m.note, m.on, m.vel === undefined ? 1 : m.vel); break;
-			case "bend": case "modwheel": case "pressure": if (!this.sending && this.host && this.host.midiFrom) this.host.midiFrom(this, m); break;
+			case "bend": case "modwheel": case "pressure": case "polypressure": case "sustain": if (!this.sending && this.host && this.host.midiFrom) this.host.midiFrom(this, m); break;
 			case "allNotesOff": this.panic(); break;
 		}
 	}
