@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a six voice analog polysynth (Mesiah-6), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -41,6 +41,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
+| `app/devices/mesiah6.js`, `app/devices/mesiah6-worklet.js` | Mesiah-6, the six voice analog polysynth |
 | `app/devices/crate.js`, `app/devices/crate-worklet.js` | Crate 60, the pad sampler and sequencer (its factory kit is made in `crate.js` and sent to the DSP) |
 | `app/devices/minimad.js`, `app/devices/minimad-worklet.js` | MiniMad, the digital paraphonic synthesizer with a touch keyboard (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
@@ -212,6 +213,41 @@ An eight voice polyphonic synthesizer with three oscillators a voice and wavetab
 - **Animate:** ANIMATE 1 and 2, held, switch on their matrix slots (by default: the filter opens; set them in SETTINGS or the MOD menu). HOLD keeps them on.
 - **Master:** VOLUME, and the **CV MOD IN** socket (±5 V), a source of the matrix. OUT L / OUT R are on the back.
 - **Not here:** the mod and pitch wheels (MIDI pitch bend works), the 60 wavetables (8 here), LFOs 3 and 4, the tuning tables, and the pedals.
+
+## Mesiah-6
+
+A six voice analog polysynth, laid out as the classic one it follows: a performance row on top and the synthesis sections in two rows under it. Every voice has two oscillators, a sub oscillator and noise, a high-pass and a low-pass filter and two envelopes. Play it from the keys, a MIDI device or the song sequencer. OUT L / OUT R are on the back.
+
+- **Display and programs:** a red 3 digit display shows the program number, the value of a knob while it turns, and the values being edited.
+  - **0-9** load a program of the current bank and tens (000-015 built in). **BANK** and **TENS**, then a number, set those digits: bank 0 holds the built-in programs, bank 1 the user programs 100-109.
+  - **WRITE**, then a number, saves the sound as user program 1*n* (kept with the rack).
+  - **GLOBALS**: MASTER TUNE (±50 cents).
+  - While a value is being edited (GLIDE, UNISON, KEY MODE, P WHL RANGE, GLOBALS), BANK and TENS step it down and up.
+- **POLY MOD:** FILTER ENV and OSC 2 (bipolar amounts) to FREQ 1, SHAPE 1, PW 1 and FILTER (it steps through LP, HP and both). OSC 2 works at audio rate: FM, and filter modulation.
+- **CLOCK:** BPM (30-250), VALUE (HALF, QTR, 8TH, 8TH dotted, 8TH swing, 8TH triplets, 16TH, 16TH swing, 16TH triplets, 32ND) and TAP TEMPO (its light blinks the beat). MIDI clock, or a cable in SEQ, takes over.
+- **ARPEGGIATOR:** ON/OFF, OCTAVES (1-3) and MODE (UP, DOWN, UP + DOWN, RANDOM, ASSIGN: in the order played). With HOLD on it latches, and a new chord replaces the held one.
+- **SEQUENCER:** 64 steps, up to 6 notes a step.
+  - **RECORD**, then play: each note or chord is a step, made when all its keys are up. TENS adds a rest, or a tie while keys are down (the step before goes on). BANK takes the last step back.
+  - **PLAY** runs it (the arpeggiator waits meanwhile). With RECORD on while it plays, a key transposes it from C4.
+  - The song sequencer's PLAY starts and stops it. The sequence is saved with the sound.
+- **AFTERTOUCH:** AMOUNT (bipolar) to FREQ 1, FREQ 2, the LFO amount, AMP and FILTER (LP, HP, both), from MIDI channel pressure.
+- **MISC PARAMETERS:** PAN SPREAD (the voices to the left and right in turn), PRGM VOL, KEY MODE (unison note priority: LO, LOr, HI, HIr, LAS, LAr; the r modes retrigger the envelopes) and P WHL RANGE (0-12 semitones).
+- **DISTORT:** stereo distortion after the voices.
+- **EFFECTS:** A then B, in series. ON/OFF, EFFECT (which one the knobs edit), CLOCK SYNC (the delay time in beats: 1, 2d, 2, 4d, 4, 8d, 4t, 8, 16d, 8t, 16, halved until under a second), TYPE, MIX and two parameters.
+  - Types: bbd (a dark delay whose pitch bends when its time moves), ddL (a clean delay), CHO (chorus), PH1 / PH2 (6 stage phasers, high and lower resonance), PH3 (4 stages), rin (ring modulator: frequency; its second knob over half makes it follow the lowest note), FL1 / FL2 (flangers).
+  - B also has the reverbs: HAL, rOO, PLA (time, early reflections) and SPr (spring: decay, tone).
+- **OSCILLATOR 1:** FREQUENCY (±24 semitones), SHAPE (triangle, saw and pulse, with the shapes in between), PULSE WIDTH, SYNC (hard synced to OSC 2).
+- **OSCILLATOR 2:** FREQUENCY, FINE (±50 cents), SHAPE, PULSE WIDTH, LOW FREQ (a slow source for POLY MOD; it leaves the mix) and KEYBOARD (off: a fixed pitch).
+- **SLOP:** the oscillators and cutoffs of each voice drift slowly on their own; in UNISON it also spreads the stacked voices.
+- **MIXER:** OSC 1, OSC 2, SUB OCTAVE (a triangle an octave under OSC 1) and NOISE.
+- **HIGH-PASS FILTER** (2 pole) and **LOW-PASS FILTER** (4 pole, self-oscillating): CUTOFF, RESONANCE, ENV AMOUNT (bipolar, from the FILTER ENVELOPE), VELOCITY (velocity scales the amount) and KEYBOARD (off, HALF, FULL).
+- **FILTER ENVELOPE** and **AMPLIFIER ENVELOPE:** ATTACK, DECAY, SUSTAIN, RELEASE; the amp also has ENV AMOUNT and VELOCITY. With ENV AMOUNT at 0 and the LFO on AMP, the LFO alone opens the amp (a gated sound).
+- **LOW FREQUENCY OSCILLATOR:** FREQUENCY (0.05-250 Hz, or a length in beats with LFO SYNC, which also restarts it with the first key), INITIAL AMT (the mod wheel adds to it), SHAPE (TRIANGLE, SAWTOOTH, REVERSE SAW, SQUARE, RANDOM; RANDOM at the top frequency is noise) and its destinations FREQ 1, FREQ 2, PW 1+2, AMP and FILTER.
+- **On the left:** MASTER VOL; GLIDE RATE and GLIDE (then BANK / TENS: FIXED RATE, FIXED RATE legato only, FIXED TIME, FIXED TIME legato only); UNISON (then BANK / TENS: 1-6 voices, or CHd). Hold a chord and press UNISON to memorize it: one key then plays the whole chord. HOLD; TRANSPOSE ±2 octaves.
+- **CV jacks:** inputs LPF (low-pass cutoff, 1 V/oct), VOL (0-5 V), SUS (a gate holds the notes) and SEQ (a clock: a step of the arpeggiator or sequencer each pulse); outputs PITCH, GATE, F.ENV and LFO.
+- **Built-in programs:** 000 Poly Brass, 001 Sync Lead, 002 String Machine, 003 Fat Bass, 004 PWM Pad, 005 FM Bell, 006 Gated Chords, 007 Spring Keys, 008 Arp Pulse, 009 Seq Bass (with a sequence), 010 Hollow Flute, 011 Noise Sweep, 012 Chord Stab (chord memory), 013 Ring Bells, 014 Low Freq Drone, 015 Hall Pad.
+- **Factory patches:** *Poly Brass*, *String Machine*, *Seq Bass* and *Chord Stab*.
+- **Simplified:** one bank of 16 built-in programs and 10 user programs instead of 1000; the oscillators are digital models (band limited saw and pulse); no poly chain, alternative tunings or MIDI out of the arpeggiator and sequencer.
 
 ## Grid 32
 
@@ -662,7 +698,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 56 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 60 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
