@@ -158,9 +158,9 @@ class RackProcessor extends AudioWorkletProcessor {
 		}
 		switch (m.type) {
 			case "note": this.noteEvent(m); break;
-			case "bend": {
+			case "bend": case "modwheel": case "pressure": {
 				const ch = Math.max(1, Math.min(16, m.channel | 0));
-				const msg = { type: "bend", value: m.value };
+				const msg = { type: m.type, value: m.value };
 				for (const poly of [false, true]) {
 					this.toChannel(ch, msg, false, poly);
 					this.toChannel(ch, msg, true, poly);

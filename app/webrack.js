@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261024b"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261024c"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -1348,6 +1348,10 @@ WRContext.prototype.onMIDIMessage = function( data )
 	}
 	else if(cmd == 0xB0 && (data[1] == 123 || data[1] == 120))
 		this.allNotesOff();
+	else if(cmd == 0xB0 && data[1] == 1) // the mod wheel, 0..1
+		this.post({ type: "modwheel", channel: channel, value: data[2] / 127 });
+	else if(cmd == 0xD0) // channel aftertouch, 0..1
+		this.post({ type: "pressure", channel: channel, value: data[1] / 127 });
 }
 
 // ---- keys device: every note source (MIDI device, on-screen keys, computer keyboard) ends here ----

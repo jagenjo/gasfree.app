@@ -10,9 +10,27 @@ var SIZE = [1568, Math.round( 16 + (760 - 30) * (1568 - 44) / (1470 - 40) )];
 var WAVE_NAMES = ["SINE", "TRIANGLE", "SAW", "SQUARE", "PULSE", "ORGAN", "VOX", "DIGITAL"];
 var MUT_MODES = [["off", "OFF"], ["fm", "FM-LIN"], ["stack", "WAVSTACK"], ["sync", "OSC SYNC"], ["pw", "PW-ASYM"], ["harmonic", "HARMONIC"], ["phazdist", "PHAZDIST"]];
 var F1_TYPES = [["lp24", "LP LADDER 24"], ["lp12", "LP 12"], ["bp", "BAND PASS"], ["hp", "HIGH PASS"], ["vowel", "VOWEL"], ["comb", "COMB"]];
-var LFO_SHAPES = [["sine", "SINE"], ["tri", "TRIANGLE"], ["saw", "SAW"], ["square", "SQUARE"], ["sh", "S&H"]];
-var ARP_MODES = [["up", "UP"], ["down", "DOWN"], ["updown", "UP/DOWN"], ["random", "RANDOM"], ["order", "AS PLAYED"]];
+var LFO_SHAPES = [["sine", "SINE"], ["tri", "TRIANGLE"], ["saw", "SAW DOWN"], ["ramp", "SAW UP"], ["square", "SQUARE"], ["sh", "S&H"], ["smooth", "SMOOTH"]];
+var ARP_MODES = [["up", "UP"], ["down", "DOWN"], ["updown", "UP/DOWN"], ["upanddn", "UP & DOWN"], ["order", "AS PLAYED"], ["random", "RANDOM"], ["chord", "CHORD"], ["phrase", "PHRASE"]];
 var ARP_DIVS = ["1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/4T", "1/32T"]; // mystic-worklet.js: the same order
+var SWINGS = [50, 52, 54, 58, 62, 66, 70, 75]; // the SWING knob's detents
+// the mod matrix (mystic-worklet.js: SOURCES / DESTS, the same ids): [id, OLED name, long name]
+var MOD_SRC = [["off", "OFF", "OFF"], ["env1", "ENV 1", "ENV 1"], ["env2", "ENV 2", "ENV 2"], ["env3", "ENV 3", "ENV 3"], ["env4", "ENV 4", "ENV 4"], ["env5", "ENV 5", "ENV 5"],
+	["lfo1", "LFO 1", "LFO 1"], ["lfo2", "LFO 2", "LFO 2"], ["lfo3", "LFO 3", "LFO 3"], ["lfo4", "LFO 4", "LFO 4"], ["lfo5", "LFO 5", "LFO 5"],
+	["vel", "VELO", "VELOCITY"], ["key", "KEYTRK", "KEYTRACK (NOTE)"], ["wheel", "MODWHL", "MOD WHEEL (CC 1)"], ["press", "PRESS", "AFTERTOUCH"], ["rand", "RANDOM", "RANDOM PER NOTE"],
+	["cv1", "CV 1", "CV MOD 1 IN"], ["cv2", "CV 2", "CV MOD 2 IN"],
+	["m1", "MACRO 1", "MACRO 1"], ["m2", "MACRO 2", "MACRO 2"], ["m3", "MACRO 3", "MACRO 3"], ["m4", "MACRO 4", "MACRO 4"], ["m5", "MACRO 5", "MACRO 5"], ["m6", "MACRO 6", "MACRO 6"], ["m7", "MACRO 7", "MACRO 7"], ["m8", "MACRO 8", "MACRO 8"]];
+var MOD_DST = [["off", "OFF", "OFF"], ["pitch", "PITCH", "PITCH, ALL OSCS"], ["pitch1", "PITCH 1", "OSC 1 PITCH"], ["pitch2", "PITCH 2", "OSC 2 PITCH"], ["pitch3", "PITCH 3", "OSC 3 PITCH"],
+	["scan1", "SCAN 1", "OSC 1 WAVSCAN"], ["scan2", "SCAN 2", "OSC 2 WAVSCAN"], ["mut1", "MUT 1", "MUTANT 1 DEPTH"], ["mut2", "MUT 2", "MUTANT 2 DEPTH"], ["mut3", "MUT 3", "MUTANT 3 DEPTH"], ["mut4", "MUT 4", "MUTANT 4 DEPTH"],
+	["vol1", "VOL 1", "OSC 1 VOLUME"], ["vol2", "VOL 2", "OSC 2 VOLUME"], ["vol3", "VOL 3", "OSC 3 VOLUME"], ["ring", "RING", "RING MOD VOLUME"], ["noise", "NOISE", "NOISE VOLUME"],
+	["cut1", "CUT 1", "FILTER 1 CUTOFF"], ["res1", "RES 1", "FILTER 1 RESONANCE"], ["drive1", "DRIVE", "FILTER 1 DRIVE"], ["cut2", "CUT 2", "FILTER 2 CUTOFF"], ["res2", "RES 2", "FILTER 2 RESONANCE"], ["morph", "MORPH", "FILTER 2 MORPH"],
+	["amp", "AMP", "AMP LEVEL"], ["pan", "PAN", "PAN"], ["premix", "PRE MIX", "PRE-FX DRY/WET"], ["postmix", "POSTMIX", "POST-FX DRY/WET"], ["dlymix", "DLY MIX", "DELAY DRY/WET"],
+	["dlyfb", "DLY FB", "DELAY FEEDBACK"], ["revmix", "REV MIX", "REVERB DRY/WET"],
+	["rate1", "RATE 1", "LFO 1 RATE"], ["rate2", "RATE 2", "LFO 2 RATE"], ["rate3", "RATE 3", "LFO 3 RATE"], ["rate4", "RATE 4", "LFO 4 RATE"], ["rate5", "RATE 5", "LFO 5 RATE"]];
+// PRE-FX and POST-FX: [id, name, P1 name, P2 name]
+var FX_TYPES = [["off", "OFF", "PARAM 1", "PARAM 2"], ["chorus", "CHORUS", "RATE", "DEPTH"], ["flanger", "FLANGER", "RATE", "FEEDBACK"], ["phaser", "PHASER", "RATE", "FEEDBACK"],
+	["tremolo", "TREMOLO", "RATE", "DEPTH"], ["lofi", "LO-FI", "BITS", "DOWNSAMPLE"], ["distort", "DISTORT", "DRIVE", "TONE"], ["comp", "COMPRESS", "AMOUNT", "RELEASE"]];
+var MATRIX_SLOTS = 16, MACRO_TARGETS = 3;
 
 var JACKS = [
 	[["MOD 1","in","mod1_in"], ["MOD 2","in","mod2_in"], ["PITCH","in","pitch_in"], ["GATE","in","gate_in"], ["CLOCK","in","clock_in"]],
@@ -21,42 +39,71 @@ var JACKS = [
 
 var M = null;
 
+function env( a, d, s, r ) { return { dl: 0, a: a, h: 0, d: d, s: s, r: r, loop: false }; }
+// the macros' first targets in a new patch: [destination, depth] (each macro has MACRO_TARGETS)
+var MACRO_DEFAULTS = [["cut1", 0.5], ["res1", 0.6], ["scan1", 1], ["scan2", 1], ["mut1", 1], ["mut3", 1], ["dlymix", 0.6], ["revmix", 0.6]];
+
 function defaults()
 {
+	var lfo = function(rate){ return { rate: rate, shape: "sine", gain: 1, trig: false }; };
+	var fx = function(){ return { type: "off", p1: 0.5, p2: 0.5, mix: 0.5 }; };
+	var matrix = [], macros = [];
+	for(var i = 0; i < MATRIX_SLOTS; ++i) matrix.push({ src: "off", dst: "off", amt: 0 });
+	MACRO_DEFAULTS.forEach(function(m){
+		var t = [{ d: m[0], a: m[1] }];
+		while(t.length < MACRO_TARGETS) t.push({ d: "off", a: 0 });
+		macros.push({ v: 0, t: t });
+	});
 	return {
 		osc: [{ wave: 2, semi: 0, cent: 0 }, { wave: 3, semi: 0, cent: 7 }, { wave: 0, semi: -12, cent: 0 }], // OSC 3: wave index
 		mut: [{ mode: "fm", ratio: 2, depth: 0, wet: 1 }, { mode: "pw", ratio: 1, depth: 0, wet: 1 },     // OSC 1
 		      { mode: "stack", ratio: 1, depth: 0, wet: 1 }, { mode: "sync", ratio: 2, depth: 0, wet: 1 }], // OSC 2
 		mix: { osc1: 0.7, osc2: 0.5, osc3: 0, ring: 0, noise: 0 },
 		f1: { type: "lp24", cutoff: 2500, res: 0.25, drive: 0.1, env: 0.35, key: 0.5 },
-		f2: { morph: 0, cutoff: 16000, res: 0.1 },
+		f2: { morph: 0, cutoff: 16000, res: 0.1, env: 0, lfo: 0 },
 		route: "series",
-		env1: { a: 0.005, d: 0.4, s: 0.3, r: 0.4 },   // filter
-		env2: { a: 0.005, d: 0.3, s: 0.8, r: 0.5 },   // amp
-		env3: { a: 0.001, d: 0.5 },                   // mod (AD)
+		env1: env( 0.005, 0.4, 0.3, 0.4 ),   // filters
+		env2: env( 0.005, 0.3, 0.8, 0.5 ),   // amp
+		env3: env( 0.001, 0.5, 0, 0.5 ),     // mutators and WAVSCAN
+		env4: env( 0.01, 0.5, 0.5, 0.5 ),    // free (mod matrix)
+		env5: env( 0.01, 0.5, 0.5, 0.5 ),
 		menv: { mut: 0, scan: 0 },
-		lfo: { rate: 5, shape: "sine", pitch: 0, scan: 0, cutoff: 0, mut: 0 },
-		vel: 0.5, volume: 0.7, voice_mode: "poly", glide: 0,
-		arp: { on: false, mode: "up", div: 3, oct: 1, gate: 0.5, latch: false, tempo: 120, swing: 50 },
+		lfo: { rate: 5, shape: "sine", gain: 1, trig: false, pitch: 0, scan: 0, cutoff: 0, mut: 0 }, // LFO 1
+		lfos: [lfo( 4 ), lfo( 0.5 ), lfo( 2 ), lfo( 0.2 )],                                         // LFO 2-5
+		amp_lfo: 0, width: 0,
+		matrix: matrix, macros: macros,
+		prefx: fx(), postfx: fx(),
+		vel: 0.5, volume: 0.7, voice_mode: "poly", glide: 0, sustain: false,
+		arp: { on: false, mode: "up", div: 3, oct: 1, gate: 0.5, latch: false, tempo: 120, swing: 50, ratchet: 1, chance: 1 },
 		delay: { on: false, time: 0.375, feedback: 0.35, tone: 5000, mix: 0.3 },
 		reverb: { on: false, time: 0.6, tone: 0.5, mix: 0.25 },
 		pads: { oct: 0, key: 0, scale: 1, mode: 0 },
 		patch: 0,
-		ui_module: "home", ui_filter: 1, ui_browse: false, shift: false // what MASTER CONTROL and FILTER CONTROLS show
+		ui_module: "home", ui_page: 0, ui_filter: 1, ui_browse: false, shift: false // what MASTER CONTROL and FILTER CONTROLS show
 	};
 }
 
 function enumOf( list, v, def ) { return list.some(function(o){ return o[0] === v; }) ? v : def; }
 
-function validate( s )
+function validate( s, raw )
 {
 	var d = defaults();
+	// a patch may list fewer matrix slots than there are (WR.mergeValid keeps only full arrays)
+	if(raw && Array.isArray( raw.matrix ) && raw.matrix.length != MATRIX_SLOTS)
+		raw.matrix.slice( 0, MATRIX_SLOTS ).forEach(function(m, i){
+			if(m && typeof m == "object") s.matrix[i] = { src: String( m.src ), dst: String( m.dst ), amt: +m.amt || 0 };
+		});
 	s.mut.forEach(function(m){ m.mode = enumOf( MUT_MODES, m.mode, "fm" ); m.ratio = Math.min( 8, Math.max( 0.25, m.ratio ) ); });
 	s.f1.type = enumOf( F1_TYPES, s.f1.type, "lp24" );
-	s.lfo.shape = enumOf( LFO_SHAPES, s.lfo.shape, "sine" );
+	[s.lfo].concat( s.lfos ).forEach(function(l){ l.shape = enumOf( LFO_SHAPES, l.shape, "sine" ); l.gain = Math.min( 1, Math.max( 0, l.gain ) ); l.trig = !!l.trig; });
+	s.matrix.forEach(function(m){ m.src = enumOf( MOD_SRC, m.src, "off" ); m.dst = enumOf( MOD_DST, m.dst, "off" ); m.amt = Math.min( 1, Math.max( -1, m.amt ) ); });
+	s.macros.forEach(function(m){ m.v = Math.min( 1, Math.max( 0, m.v ) ); m.t.forEach(function(t){ t.d = enumOf( MOD_DST, t.d, "off" ); t.a = Math.min( 1, Math.max( -1, t.a ) ); }); });
+	[s.prefx, s.postfx].forEach(function(f){ f.type = enumOf( FX_TYPES, f.type, "off" ); });
+	[s.env1, s.env2, s.env3, s.env4, s.env5].forEach(function(e){ e.dl = Math.max( 0, e.dl ); e.h = Math.max( 0, e.h ); e.loop = !!e.loop; });
 	s.arp.mode = enumOf( ARP_MODES, s.arp.mode, "up" );
 	s.arp.div = Math.min( ARP_DIVS.length - 1, Math.max( 0, Math.round( s.arp.div ) ) );
 	s.arp.swing = Math.min( 75, Math.max( 50, s.arp.swing ) );
+	s.arp.ratchet = Math.min( 4, Math.max( 1, Math.round( s.arp.ratchet ) ) ); s.arp.chance = Math.min( 1, Math.max( 0, s.arp.chance ) );
 	s.pads.oct = Math.min( 3, Math.max( -3, Math.round( s.pads.oct ) ) ); s.pads.key = ((Math.round( s.pads.key ) % 12) + 12) % 12;
 	s.pads.scale = Math.min( 15, Math.max( 0, Math.round( s.pads.scale ) ) ); s.pads.mode = s.pads.mode ? 1 : 0;
 	s.patch = Math.min( PATCHES.length - 1, Math.max( 0, Math.round( s.patch ) ) );
@@ -64,6 +111,7 @@ function validate( s )
 	if(s.route != "series" && s.route != "parallel") s.route = "series";
 	if(s.voice_mode != "poly" && s.voice_mode != "mono") s.voice_mode = "poly";
 	if(MODULE_ORDER.indexOf( s.ui_module ) < 0) s.ui_module = "home";
+	s.ui_page = Math.max( 0, Math.min( pageCount( s.ui_module ) - 1, Math.round( s.ui_page ) || 0 ) );
 	s.ui_filter = s.ui_filter == 2 ? 2 : 1;
 	s.osc.forEach(function(o, i){ o.wave = Math.min( 7, Math.max( 0, i == 2 ? Math.round( o.wave ) : o.wave ) ); });
 }
@@ -91,6 +139,15 @@ function randomize( s )
 	s.env3.d = expRnd( 0.05, 2 ); s.menv.mut = chance(0.5) ? rnd( -0.5, 0.7 ) : 0; s.menv.scan = chance(0.4) ? rnd( -0.5, 0.5 ) : 0;
 	s.lfo.rate = expRnd( 0.1, 8 ); s.lfo.shape = pick( LFO_SHAPES )[0];
 	s.lfo.pitch = chance(0.2) ? rnd( 0, 0.3 ) : 0; s.lfo.scan = chance(0.4) ? rnd( 0, 0.5 ) : 0; s.lfo.mut = chance(0.3) ? rnd( 0, 0.4 ) : 0;
+	// ENV 4 and LFO 3 into the mod matrix, now and then; an effect or two
+	s.matrix.forEach(function(m){ m.src = "off"; m.dst = "off"; m.amt = 0; });
+	s.env4.a = expRnd( 0.001, 1 ); s.env4.d = expRnd( 0.05, 1 ); s.env4.s = rnd( 0, 1 ); s.env4.loop = chance(0.3);
+	s.lfos[1].rate = expRnd( 0.1, 6 ); s.lfos[1].shape = pick( LFO_SHAPES )[0];
+	if(chance(0.5)) s.matrix[0] = { src: "env4", dst: pick([ "cut1", "scan1", "scan2", "mut2", "morph" ]), amt: rnd( -0.5, 0.6 ) };
+	if(chance(0.5)) s.matrix[1] = { src: "lfo3", dst: pick([ "scan1", "scan2", "mut1", "mut4", "pan", "cut2" ]), amt: rnd( 0.1, 0.5 ) };
+	s.prefx.type = chance(0.4) ? pick( FX_TYPES.slice( 1 ) )[0] : "off"; s.prefx.p1 = rnd( 0, 1 ); s.prefx.p2 = rnd( 0, 1 ); s.prefx.mix = rnd( 0.2, 0.7 );
+	s.postfx.type = chance(0.3) ? pick([ "chorus", "phaser", "flanger", "comp" ]) : "off"; s.postfx.p1 = rnd( 0, 0.6 ); s.postfx.p2 = rnd( 0, 0.8 ); s.postfx.mix = rnd( 0.2, 0.6 );
+	s.width = rnd( 0, 0.8 );
 }
 
 // ---------------------------------------------------------------------------
@@ -216,9 +273,9 @@ function P( label, path, min, max, o )
 	return { label: label, get: get, set: set, min: min, max: max, o: o || {} };
 }
 // a parameter choosing from a list [[value, NAME], ...]
-function PL( label, path, list )
+function PL( label, path, list, def )
 {
-	var p = P( label, path, 0, list.length - 1, { step: 1 } );
+	var p = P( label, path, 0, list.length - 1, { step: 1, def: def } );
 	var get = p.get, set = p.set;
 	p.get = function(s) { return Math.max( 0, list.findIndex(function(o){ return o[0] === get( s ); }) ); };
 	p.set = function(s, v) { set( s, list[ Math.round( v ) ][0] ); };
@@ -252,17 +309,56 @@ var mutParams = function(i) {
 		P( "LFO1>MUT", "lfo.mut", 0, 1, { def: 0, format: fP } )
 	];
 };
-var envParams = function(e, adsr) {
-	var list = [ P( "ATTACK", e + ".a", 0.001, 10, { exp: true, def: 0.005, format: fT } ), P( "DECAY", e + ".d", 0.002, 10, { exp: true, def: 0.4, format: fT } ) ];
-	if(adsr) list.push( P( "SUSTAIN", e + ".s", 0, 1, { def: 0.5, format: fP } ), P( "RELEASE", e + ".r", 0.002, 10, { exp: true, def: 0.4, format: fT } ) );
+var fOff = function(v){ return v < 0.001 ? "OFF" : fT( v ); };
+var fRate = function(v){ return v < 10 ? v.toFixed(2) + "HZ" : Math.round( v ) + "HZ"; };
+// an envelope: DELAY, ATTACK, HOLD, DECAY, SUSTAIN, RELEASE, LOOP
+var envParams = function(e) {
+	return [ P( "DELAY", e + ".dl", 0, 4, { def: 0, format: fOff } ), P( "ATTACK", e + ".a", 0.001, 10, { exp: true, def: 0.005, format: fT } ),
+		P( "HOLD", e + ".h", 0, 4, { def: 0, format: fOff } ), P( "DECAY", e + ".d", 0.002, 10, { exp: true, def: 0.4, format: fT } ),
+		P( "SUSTAIN", e + ".s", 0, 1, { def: 0.5, format: fP } ), P( "RELEASE", e + ".r", 0.002, 10, { exp: true, def: 0.4, format: fT } ),
+		PL( "LOOP", e + ".loop", ONOFF, 0 ) ];
+};
+var lfoParams = function(path, def) {
+	return [ P( "RATE", path + ".rate", 0.01, 50, { exp: true, def: def, format: fRate } ), PL( "WAVE", path + ".shape", LFO_SHAPES, 0 ),
+		P( "GAIN", path + ".gain", 0, 1, { def: 1, format: fP } ), PL( "TRIG", path + ".trig", [[false, "FREE"], [true, "NOTE"]], 0 ) ];
+};
+var fxParams = function(path) {
+	var f = function(){ var x = M && M.settings[ path ]; return FX_TYPES.find(function(t){ return x && t[0] == x.type; }) || FX_TYPES[0]; };
+	return [ PL( "TYPE", path + ".type", FX_TYPES, 0 ), P( f()[2], path + ".p1", 0, 1, { def: 0.5, format: fP } ),
+		P( f()[3], path + ".p2", 0, 1, { def: 0.5, format: fP } ), P( "DRY/WET", path + ".mix", 0, 1, { def: 0.5, format: fP } ) ];
+};
+var dstName = function(id){ var d = MOD_DST.find(function(o){ return o[0] == id; }); return d ? d[1] : "OFF"; };
+// MOD MATRIX: two slots a page (SOURCE, DESTINATION, DEPTH); MACRO ASSIGN: one macro a page
+var matrixParams = function() {
+	var list = [];
+	for(var i = 0; i < MATRIX_SLOTS; ++i)
+		list.push( PL( "SOURCE " + (i + 1), "matrix." + i + ".src", MOD_SRC, 0 ), PL( "DEST " + (i + 1), "matrix." + i + ".dst", MOD_DST, 0 ),
+			P( "DEPTH " + (i + 1), "matrix." + i + ".amt", -1, 1, { def: 0, bipolar: true, format: fS } ), null );
+	return list;
+};
+var macroParams = function() {
+	var list = [];
+	for(var i = 0; i < 8; ++i)
+	{
+		list.push( P( "MACRO " + (i + 1), "macros." + i + ".v", 0, 1, { def: 0, format: fP } ) );
+		for(var k = 0; k < MACRO_TARGETS; ++k)
+		{
+			if(k == 1) list.push( null ); // the second target starts the lower row
+			list.push( PL( "TARGET " + (k + 1), "macros." + i + ".t." + k + ".d", MOD_DST, k ? 0 : MOD_DST.findIndex(function(o){ return o[0] == MACRO_DEFAULTS[i][0]; }) ),
+				P( "DEPTH " + (k + 1), "macros." + i + ".t." + k + ".a", -1, 1, { def: k ? 0 : MACRO_DEFAULTS[i][1], bipolar: true, format: fS } ) );
+		}
+	}
 	return list;
 };
 var ARP_DIV_UI = [["1/4", 0, 6], ["1/8", 1, 2], ["1/16", 3, 4], ["1/32", 5, 7]]; // the DIVISION knob, [straight, triplet] arp.div
 var MODULES = {
-	home: { name: "HOME", params: function(){ return [ P( "CUTOFF", "f1.cutoff", 20, 20000, { exp: true, def: 2500, format: fHz } ), P( "RESONANCE", "f1.res", 0, 1, { def: 0.25, format: fP } ),
-		P( "WAVSCAN 1", "osc.0.wave", 0, 7, { def: 2, format: wave } ), P( "WAVSCAN 2", "osc.1.wave", 0, 7, { def: 3, format: wave } ),
-		P( "MUTANT 1", "mut.0.depth", 0, 1, { def: 0, format: fP } ), P( "ENV1 AMT", "f1.env", -1, 1, { def: 0.35, bipolar: true, format: fS } ),
-		P( "LFO1 RATE", "lfo.rate", 0.01, 50, { exp: true, def: 5, format: function(v){ return v < 10 ? v.toFixed(2) + "HZ" : Math.round( v ) + "HZ"; } } ), P( "REVERB", "reverb.mix", 0, 1, { def: 0.25, format: fP } ) ]; } },
+	// HOME: the 8 macros, named after their first target
+	home: { name: "HOME", params: function(){
+		var m = M ? M.settings.macros : [];
+		return [0, 1, 2, 3, 4, 5, 6, 7].map(function(i){
+			var d = m[i] && m[i].t[0].d != "off" ? dstName( m[i].t[0].d ) : "";
+			return P( "M" + (i + 1) + " " + d, "macros." + i + ".v", 0, 1, { def: 0, format: fP } );
+		}); } },
 	osc1: { name: "OSC 1", params: function(){ return oscParams( 0 ); } },
 	osc2: { name: "OSC 2", params: function(){ return oscParams( 1 ); } },
 	osc3: { name: "OSC 3", params: function(){ return oscParams( 2 ); } },
@@ -272,22 +368,36 @@ var MODULES = {
 	mut4: { name: "MUTANT 4", params: function(){ return mutParams( 3 ); } },
 	ring: { name: "RING-NOISE", params: function(){ return [ P( "RING MOD", "mix.ring", 0, 1, { def: 0, format: fP } ), P( "NOISE", "mix.noise", 0, 1, { def: 0, format: fP } ) ]; } },
 	mixer: { name: "MIXER", params: function(){ return [ P( "OSC1 VOL", "mix.osc1", 0, 1, { def: 0.7, format: fP } ), P( "OSC2 VOL", "mix.osc2", 0, 1, { def: 0.5, format: fP } ),
-		P( "OSC3 VOL", "mix.osc3", 0, 1, { def: 0, format: fP } ), P( "RING VOL", "mix.ring", 0, 1, { def: 0, format: fP } ), P( "NOISE VOL", "mix.noise", 0, 1, { def: 0, format: fP } ) ]; } },
+		P( "OSC3 VOL", "mix.osc3", 0, 1, { def: 0, format: fP } ), P( "RING VOL", "mix.ring", 0, 1, { def: 0, format: fP } ), P( "NOISE VOL", "mix.noise", 0, 1, { def: 0, format: fP } ),
+		P( "WIDTH", "width", 0, 1, { def: 0, format: fP } ) ]; } },
 	filter1: { name: "FILTER 1", params: function(){ return [ PL( "TYPE", "f1.type", F1_TYPES ), P( "CUTOFF", "f1.cutoff", 20, 20000, { exp: true, def: 2500, format: fHz } ),
 		P( "RESONANCE", "f1.res", 0, 1, { def: 0.25, format: fP } ), P( "DRIVE", "f1.drive", 0, 1, { def: 0.1, format: fP } ),
 		P( "ENV1 AMT", "f1.env", -1, 1, { def: 0.35, bipolar: true, format: fS } ), P( "KEYTRACK", "f1.key", 0, 1, { def: 0.5, format: fP } ),
 		P( "LFO1 AMT", "lfo.cutoff", 0, 1, { def: 0, format: fP } ), PL( "ROUTING", "route", [["series", "SERIES"], ["parallel", "PARALLEL"]] ) ]; } },
 	filter2: { name: "FILTER 2", params: function(){ return [ P( "MORPH", "f2.morph", 0, 1, { def: 0, format: function(v){ return v < 0.25 ? "LP" : (v < 0.75 ? "BP" : "HP") + " " + Math.round( v * 100 ); } } ),
 		P( "CUTOFF", "f2.cutoff", 20, 20000, { exp: true, def: 16000, format: fHz } ), P( "RESONANCE", "f2.res", 0, 1, { def: 0.1, format: fP } ),
-		PL( "ROUTING", "route", [["series", "SERIES"], ["parallel", "PARALLEL"]] ) ]; } },
-	amp: { name: "AMP", params: function(){ return envParams( "env2", true ).concat([ P( "VOLUME", "volume", 0, 1, { def: 0.7, format: fP } ), P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ) ]); } },
+		PL( "ROUTING", "route", [["series", "SERIES"], ["parallel", "PARALLEL"]] ),
+		P( "ENV1 AMT", "f2.env", -1, 1, { def: 0, bipolar: true, format: fS } ), P( "LFO1 AMT", "f2.lfo", 0, 1, { def: 0, format: fP } ) ]; } },
+	amp: { name: "AMP", params: function(){ return [ P( "ATTACK", "env2.a", 0.001, 10, { exp: true, def: 0.005, format: fT } ), P( "DECAY", "env2.d", 0.002, 10, { exp: true, def: 0.3, format: fT } ),
+		P( "SUSTAIN", "env2.s", 0, 1, { def: 0.8, format: fP } ), P( "RELEASE", "env2.r", 0.002, 10, { exp: true, def: 0.5, format: fT } ),
+		P( "VOLUME", "volume", 0, 1, { def: 0.7, format: fP } ), P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ),
+		P( "LFO2 AMT", "amp_lfo", 0, 1, { def: 0, format: fP } ), P( "WIDTH", "width", 0, 1, { def: 0, format: fP } ) ]; } },
+	prefx: { name: "PRE-FX", params: function(){ return fxParams( "prefx" ); } },
+	postfx: { name: "POST-FX", params: function(){ return fxParams( "postfx" ); } },
 	voice: { name: "VOICE", params: function(){ return [ PL( "POLYPHONY", "voice_mode", [["poly", "POLY 8"], ["mono", "MONO"]] ), P( "GLIDE", "glide", 0, 2, { def: 0, format: function(v){ return v < 0.001 ? "OFF" : fT( v ); } } ),
-		P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ), P( "VOLUME", "volume", 0, 1, { def: 0.7, format: fP } ) ]; } },
-	env1: { name: "ENV 1", params: function(){ return envParams( "env1", true ).concat([ P( "FILTER1 AMT", "f1.env", -1, 1, { def: 0.35, bipolar: true, format: fS } ) ]); } },
-	env2: { name: "ENV 2", params: function(){ return envParams( "env2", true ).concat([ P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ) ]); } },
-	env3: { name: "ENV 3", params: function(){ return envParams( "env3", false ).concat([ P( ">MUTANTS", "menv.mut", -1, 1, { def: 0, bipolar: true, format: fS } ), P( ">WAVSCAN", "menv.scan", -1, 1, { def: 0, bipolar: true, format: fS } ) ]); } },
-	lfo1: { name: "LFO 1", params: function(){ return [ P( "RATE", "lfo.rate", 0.01, 50, { exp: true, def: 5, format: function(v){ return v < 10 ? v.toFixed(2) + "HZ" : Math.round( v ) + "HZ"; } } ), PL( "WAVE", "lfo.shape", LFO_SHAPES ),
-		P( ">PITCH", "lfo.pitch", 0, 1, { def: 0, format: fP } ), P( ">WAVSCAN", "lfo.scan", 0, 1, { def: 0, format: fP } ), P( ">CUTOFF", "lfo.cutoff", 0, 1, { def: 0, format: fP } ), P( ">MUTANTS", "lfo.mut", 0, 1, { def: 0, format: fP } ) ]; } },
+		P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ), P( "VOLUME", "volume", 0, 1, { def: 0.7, format: fP } ),
+		P( "WIDTH", "width", 0, 1, { def: 0, format: fP } ), PL( "SUSTAIN", "sustain", ONOFF, 0 ) ]; } },
+	env1: { name: "ENV 1", params: function(){ return envParams( "env1" ).concat([ P( ">FILTER 1", "f1.env", -1, 1, { def: 0.35, bipolar: true, format: fS } ), P( ">FILTER 2", "f2.env", -1, 1, { def: 0, bipolar: true, format: fS } ) ]); } },
+	env2: { name: "ENV 2", params: function(){ return envParams( "env2" ).concat([ P( "VELOCITY", "vel", 0, 1, { def: 0.5, format: fP } ) ]); } },
+	env3: { name: "ENV 3", params: function(){ return envParams( "env3" ).concat([ P( ">MUTANTS", "menv.mut", -1, 1, { def: 0, bipolar: true, format: fS } ), P( ">WAVSCAN", "menv.scan", -1, 1, { def: 0, bipolar: true, format: fS } ) ]); } },
+	env4: { name: "ENV 4", params: function(){ return envParams( "env4" ); } },
+	env5: { name: "ENV 5", params: function(){ return envParams( "env5" ); } },
+	lfo1: { name: "LFO 1", params: function(){ return lfoParams( "lfo", 5 ).concat([ P( ">PITCH", "lfo.pitch", 0, 1, { def: 0, format: fP } ), P( ">WAVSCAN", "lfo.scan", 0, 1, { def: 0, format: fP } ),
+		P( ">FILTER 1", "lfo.cutoff", 0, 1, { def: 0, format: fP } ), P( ">MUTANTS", "lfo.mut", 0, 1, { def: 0, format: fP } ), P( ">FILTER 2", "f2.lfo", 0, 1, { def: 0, format: fP } ) ]); } },
+	lfo2: { name: "LFO 2", params: function(){ return lfoParams( "lfos.0", 4 ).concat([ P( ">AMP", "amp_lfo", 0, 1, { def: 0, format: fP } ) ]); } },
+	lfo3: { name: "LFO 3", params: function(){ return lfoParams( "lfos.1", 0.5 ); } },
+	lfo4: { name: "LFO 4", params: function(){ return lfoParams( "lfos.2", 2 ); } },
+	lfo5: { name: "LFO 5", params: function(){ return lfoParams( "lfos.3", 0.2 ); } },
 	delay: { name: "DELAY", params: function(){ return [ PL( "DELAY", "delay.on", ONOFF ), P( "TIME", "delay.time", 0.01, 2, { exp: true, def: 0.375, format: fT } ),
 		P( "FEEDBACK", "delay.feedback", 0, 0.95, { def: 0.35, format: fP } ), P( "WET TONE", "delay.tone", 200, 18000, { exp: true, def: 5000, format: fHz } ), P( "DRY/WET", "delay.mix", 0, 1, { def: 0.3, format: fP } ) ]; } },
 	reverb: { name: "REVERB", params: function(){ return [ PL( "REVERB", "reverb.on", ONOFF ), P( "TIME", "reverb.time", 0, 1, { def: 0.6, format: fP } ),
@@ -295,13 +405,15 @@ var MODULES = {
 	arp: { name: "ARPEGGIATOR", params: function(){ return [ PL( "ARP", "arp.on", ONOFF ), P( "TEMPO", "arp.tempo", 30, 300, { exp: true, def: 120, format: function(v){ return Math.round( v ) + " BPM"; } } ),
 		PL( "MODE", "arp.mode", ARP_MODES ), P( "OCTAVE", "arp.oct", 1, 4, { step: 1, def: 1, format: function(v){ return String( v ); } } ),
 		P( "GATE", "arp.gate", 0.05, 1, { def: 0.5, format: fP } ), P( "SWING", "arp.swing", 50, 75, { def: 50, format: function(v){ return v < 50.5 ? "OFF" : Math.round( v ) + "%"; } } ),
-		PL( "LATCH", "arp.latch", ONOFF ), P( "DIVISION", "arp.div", 0, 7, { step: 1, def: 3, format: function(v){ return ARP_DIVS[v]; } } ) ]; } },
-	modmatrix: { name: "MOD MATRIX", params: function(){ return [ P( "ENV3>MUT", "menv.mut", -1, 1, { def: 0, bipolar: true, format: fS } ), P( "ENV3>SCAN", "menv.scan", -1, 1, { def: 0, bipolar: true, format: fS } ),
-		P( "LFO1>PITCH", "lfo.pitch", 0, 1, { def: 0, format: fP } ), P( "LFO1>SCAN", "lfo.scan", 0, 1, { def: 0, format: fP } ),
-		P( "LFO1>CUT", "lfo.cutoff", 0, 1, { def: 0, format: fP } ), P( "LFO1>MUT", "lfo.mut", 0, 1, { def: 0, format: fP } ),
-		P( "ENV1>CUT", "f1.env", -1, 1, { def: 0.35, bipolar: true, format: fS } ), P( "VEL>AMP", "vel", 0, 1, { def: 0.5, format: fP } ) ]; } }
+		PL( "LATCH", "arp.latch", ONOFF ), P( "DIVISION", "arp.div", 0, 7, { step: 1, def: 3, format: function(v){ return ARP_DIVS[v]; } } ),
+		P( "RATCHET", "arp.ratchet", 1, 4, { step: 1, def: 1, format: function(v){ return v + "X"; } } ), P( "CHANCE", "arp.chance", 0, 1, { def: 1, format: fP } ) ]; } },
+	modmatrix: { name: "MOD MATRIX", params: matrixParams },
+	macro: { name: "MACRO ASSIGN", params: macroParams }
 };
-var MODULE_ORDER = ["home", "osc1", "mut1", "mut2", "osc2", "mut3", "mut4", "osc3", "ring", "mixer", "filter1", "filter2", "amp", "env1", "env2", "env3", "lfo1", "delay", "reverb", "arp", "voice", "modmatrix"];
+var MODULE_ORDER = ["home", "osc1", "mut1", "mut2", "osc2", "mut3", "mut4", "osc3", "ring", "mixer", "filter1", "filter2", "amp", "prefx", "delay", "reverb", "postfx",
+	"env1", "env2", "env3", "env4", "env5", "lfo1", "lfo2", "lfo3", "lfo4", "lfo5", "arp", "voice", "modmatrix", "macro"];
+function pageCount( k ) { return Math.max( 1, Math.ceil( (MODULES[k] || MODULES.home).params().length / 8 ) ); }
+function setModule( s, k, page ) { s.ui_module = k; s.ui_page = page || 0; s.ui_browse = false; }
 
 // the patches MAIN SYSTEMS browses: settings over the defaults
 var PATCHES = [
@@ -313,12 +425,19 @@ var PATCHES = [
 	["VOWEL CHOIR", "PAD", {"osc":[{"wave":6,"semi":0,"cent":0},{"wave":5.5,"semi":7,"cent":4},{"wave":0,"semi":-12,"cent":0}],"mut":[{"mode":"harmonic","ratio":2,"depth":0.25,"wet":0.8},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"stack","ratio":1.5,"depth":0.4,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1}],"mix":{"osc1":0.6,"osc2":0.5,"osc3":0.2,"ring":0,"noise":0.05},"f1":{"type":"vowel","cutoff":1200,"res":0.5,"drive":0,"env":0.3,"key":0.3},"env1":{"a":1.5,"d":3,"s":0.6,"r":2},"env2":{"a":0.6,"d":1,"s":0.9,"r":2},"lfo":{"rate":0.2,"shape":"tri","pitch":0.04,"scan":0,"cutoff":0.25,"mut":0},"reverb":{"on":true,"time":0.85,"tone":0.4,"mix":0.45}}],
 	["SUB BASS", "BASS", {"osc":[{"wave":0,"semi":-12,"cent":0},{"wave":3,"semi":-12,"cent":0},{"wave":0,"semi":-24,"cent":0}],"mix":{"osc1":0.8,"osc2":0.3,"osc3":0.5,"ring":0,"noise":0},"f1":{"type":"lp24","cutoff":500,"res":0.3,"drive":0.5,"env":0.4,"key":0.3},"env1":{"a":0.001,"d":0.3,"s":0.2,"r":0.2},"env2":{"a":0.002,"d":0.4,"s":0.8,"r":0.15},"voice_mode":"mono","glide":0.03}],
 	["COMB PLUCK", "PLUCK", {"osc":[{"wave":4,"semi":0,"cent":0},{"wave":2,"semi":12,"cent":0},{"wave":0,"semi":0,"cent":0}],"mut":[{"mode":"pw","ratio":1,"depth":0.4,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1}],"mix":{"osc1":0.7,"osc2":0.3,"osc3":0,"ring":0,"noise":0.2},"f1":{"type":"comb","cutoff":800,"res":0.85,"drive":0.1,"env":0.5,"key":1},"env1":{"a":0.001,"d":0.15,"s":0,"r":0.1},"env2":{"a":0.001,"d":0.9,"s":0,"r":0.6},"delay":{"on":true,"time":0.25,"feedback":0.4,"tone":3000,"mix":0.3}}]
+,
+	// these use the five envelopes and LFOs, the mod matrix and the effects
+	["LOOP PULSE", "ARP", {"osc":[{"wave":2,"semi":0,"cent":-4},{"wave":3.4,"semi":-12,"cent":4},{"wave":0,"semi":-12,"cent":0}],"mix":{"osc1":0.7,"osc2":0.5,"osc3":0.3,"ring":0,"noise":0},"f1":{"type":"lp24","cutoff":350,"res":0.55,"drive":0.35,"env":0.1,"key":0.4},"env2":{"dl":0,"a":0.01,"h":0,"d":0.5,"s":0.9,"r":0.8,"loop":false},"env4":{"dl":0,"a":0.002,"h":0.02,"d":0.16,"s":0,"r":0.2,"loop":true},"lfos":[{"rate":4,"shape":"sine","gain":1,"trig":false},{"rate":0.15,"shape":"tri","gain":1,"trig":false},{"rate":2,"shape":"sine","gain":1,"trig":false},{"rate":0.2,"shape":"sine","gain":1,"trig":false}],"matrix":[{"src":"env4","dst":"cut1","amt":0.55},{"src":"lfo3","dst":"scan2","amt":0.4},{"src":"wheel","dst":"res1","amt":0.4}],"width":0.6,"delay":{"on":true,"time":0.3,"feedback":0.4,"tone":3500,"mix":0.25},"reverb":{"on":true,"time":0.6,"tone":0.5,"mix":0.2}}],
+	["CHORUS STRINGS", "PAD", {"osc":[{"wave":2,"semi":0,"cent":-7},{"wave":2,"semi":0,"cent":7},{"wave":1,"semi":12,"cent":0}],"mut":[{"mode":"stack","ratio":2,"depth":0.5,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"stack","ratio":2.5,"depth":0.5,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1}],"mix":{"osc1":0.6,"osc2":0.6,"osc3":0.15,"ring":0,"noise":0},"f1":{"type":"lp12","cutoff":3000,"res":0.1,"drive":0,"env":0.15,"key":0.5},"env1":{"dl":0,"a":0.9,"h":0,"d":2,"s":0.6,"r":1.5,"loop":false},"env2":{"dl":0,"a":0.6,"h":0,"d":1,"s":0.9,"r":1.8,"loop":false},"lfos":[{"rate":4,"shape":"sine","gain":1,"trig":false},{"rate":5.5,"shape":"tri","gain":1,"trig":false},{"rate":2,"shape":"sine","gain":1,"trig":false},{"rate":0.2,"shape":"sine","gain":1,"trig":false}],"matrix":[{"src":"lfo3","dst":"pitch","amt":0.006},{"src":"vel","dst":"cut1","amt":0.25},{"src":"wheel","dst":"pitch","amt":0.02}],"prefx":{"type":"chorus","p1":0.35,"p2":0.6,"mix":0.6},"width":0.9,"reverb":{"on":true,"time":0.75,"tone":0.5,"mix":0.3}}],
+	["PHASE KEYS", "KEYS", {"osc":[{"wave":5,"semi":0,"cent":0},{"wave":0,"semi":12,"cent":2},{"wave":0,"semi":0,"cent":0}],"mix":{"osc1":0.7,"osc2":0.3,"osc3":0,"ring":0,"noise":0},"f1":{"type":"lp12","cutoff":7000,"res":0,"drive":0.2,"env":0.1,"key":0.3},"env2":{"dl":0,"a":0.003,"h":0,"d":1.2,"s":0.6,"r":0.3,"loop":false},"lfos":[{"rate":6,"shape":"sine","gain":1,"trig":false},{"rate":0.5,"shape":"sine","gain":1,"trig":false},{"rate":2,"shape":"sine","gain":1,"trig":false},{"rate":0.2,"shape":"sine","gain":1,"trig":false}],"amp_lfo":0.15,"postfx":{"type":"phaser","p1":0.3,"p2":0.5,"mix":0.6},"width":0.5,"reverb":{"on":true,"time":0.5,"tone":0.6,"mix":0.2}}],
+	["WOBBLE BASS", "BASS", {"osc":[{"wave":2,"semi":-12,"cent":0},{"wave":3,"semi":-12,"cent":5},{"wave":0,"semi":-24,"cent":0}],"mut":[{"mode":"sync","ratio":1.5,"depth":0.2,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1},{"mode":"off","ratio":1,"depth":0,"wet":1}],"mix":{"osc1":0.7,"osc2":0.5,"osc3":0.5,"ring":0,"noise":0},"f1":{"type":"lp24","cutoff":300,"res":0.5,"drive":0.5,"env":0.15,"key":0.3},"env2":{"dl":0,"a":0.003,"h":0,"d":0.4,"s":0.9,"r":0.15,"loop":false},"lfos":[{"rate":4,"shape":"sine","gain":1,"trig":false},{"rate":3,"shape":"sine","gain":1,"trig":true},{"rate":2,"shape":"sine","gain":1,"trig":false},{"rate":0.2,"shape":"sine","gain":1,"trig":false}],"matrix":[{"src":"lfo3","dst":"cut1","amt":0.45},{"src":"wheel","dst":"rate3","amt":0.6},{"src":"lfo3","dst":"mut1","amt":0.3}],"voice_mode":"mono","glide":0.04,"postfx":{"type":"distort","p1":0.35,"p2":0.6,"mix":0.4}}],
+	["RATCHET CHORDS", "ARP", {"osc":[{"wave":4,"semi":0,"cent":0},{"wave":2,"semi":7,"cent":5},{"wave":0,"semi":-12,"cent":0}],"mix":{"osc1":0.6,"osc2":0.4,"osc3":0.3,"ring":0,"noise":0.05},"f1":{"type":"lp24","cutoff":1500,"res":0.35,"drive":0.2,"env":0.45,"key":0.5},"env1":{"dl":0,"a":0.001,"h":0,"d":0.18,"s":0.05,"r":0.15,"loop":false},"env2":{"dl":0,"a":0.001,"h":0,"d":0.25,"s":0.2,"r":0.15,"loop":false},"lfos":[{"rate":4,"shape":"sine","gain":1,"trig":false},{"rate":0.1,"shape":"tri","gain":1,"trig":false},{"rate":2,"shape":"sine","gain":1,"trig":false},{"rate":0.2,"shape":"sine","gain":1,"trig":false}],"matrix":[{"src":"lfo3","dst":"cut1","amt":0.3},{"src":"rand","dst":"pan","amt":0.6}],"arp":{"on":true,"mode":"chord","div":3,"oct":2,"gate":0.6,"latch":true,"tempo":118,"swing":54,"ratchet":2,"chance":0.8},"postfx":{"type":"lofi","p1":0.6,"p2":0.25,"mix":0.5},"delay":{"on":true,"time":0.38,"feedback":0.4,"tone":3000,"mix":0.25}}]
 ];
 function deepMerge( a, b ) { Object.keys( b ).forEach(function(k){ if(b[k] && typeof b[k] == "object" && !Array.isArray( b[k] ) && a[k] && typeof a[k] == "object") deepMerge( a[k], b[k] ); else if(Array.isArray( b[k] )) b[k].forEach(function(x, i){ if(x && typeof x == "object" && a[k][i]) deepMerge( a[k][i], x ); else a[k][i] = x; }); else a[k] = b[k]; }); }
 function loadPatch( s, i )
 {
 	var d = defaults(), keep = {};
-	["ui_module", "ui_filter", "ui_browse", "shift", "pads", "midi_channel", "midi_master", "knob_skin"].forEach(function(k){ if(s[k] !== undefined) keep[k] = s[k]; });
+	["ui_module", "ui_page", "ui_filter", "ui_browse", "shift", "pads", "midi_channel", "midi_master", "knob_skin"].forEach(function(k){ if(s[k] !== undefined) keep[k] = s[k]; });
 	deepMerge( d, JSON.parse( JSON.stringify( PATCHES[i][2] ) ) );
 	Object.keys( s ).forEach(function(k){ delete s[k]; });
 	Object.assign( s, d, keep );
@@ -341,6 +460,9 @@ function padNotes( pd, row, col )
 	var note = function(i){ return 48 + pd.oct * 12 + pd.key + Math.floor( i / sc.length ) * 12 + sc[ i % sc.length ]; };
 	return pd.mode == 1 ? [ note( idx ), note( idx + 2 ), note( idx + 4 ) ] : [ note( idx ) ];
 }
+
+// the patch ring's colour, by category
+var CAT_COLORS = { INIT: "#dfe6ee", PAD: "#4a7dff", KEYS: "#ffc83a", ARP: "#3adf7a", LEAD: "#ff4b3a", BASS: "#a855ff", PLUCK: "#ff8a2a" };
 
 var held = {}; // module id -> pads held (their notes) / encoder drag
 
@@ -428,10 +550,11 @@ function drawArp()
 	section( "ARPEGGIATOR", 272, 165, 665, 355 );
 	// MODE, OCTAVE, DIVISION (+ TRIPLET), SWING, their printed choices
 	var mi = Math.max( 0, ARP_MODES.findIndex(function(o){ return o[0] == a.mode; }) );
-	mi = silverKnob( "arp_mode", 325, 248, 16, mi, 0, ARP_MODES.length - 1, { step: 1, def: 0, ticks: 5, format: function(v){ return "MODE " + ARP_MODES[v][1]; } } );
+	mi = silverKnob( "arp_mode", 325, 248, 16, mi, 0, ARP_MODES.length - 1, { step: 1, def: 0, ticks: 8, format: function(v){ return "MODE " + ARP_MODES[v][1]; } } );
 	a.mode = ARP_MODES[ mi ][0];
-	["UP", "DOWN", "UP/DN"].forEach(function(l, i){ t( l, 280, 210 + i * 11, 6.5, mi == i ? WHITE : "#8a8a8a", "left", true ); });
-	["RANDOM", "ORDER"].forEach(function(l, i){ t( l, 372, 210 + i * 11, 6.5, mi == 3 + i ? WHITE : "#8a8a8a", "right", true ); });
+	// the left four from the bottom up, the right four from the top down
+	["UP", "DOWN", "UP/DN", "UP&DN"].forEach(function(l, i){ t( l, 279, 247 - i * 11, 6.5, mi == i ? WHITE : "#8a8a8a", "left", true ); });
+	["ORDER", "RANDOM", "CHORD", "PHRASE"].forEach(function(l, i){ t( l, 373, 214 + i * 11, 6.5, mi == 4 + i ? WHITE : "#8a8a8a", "right", true ); });
 	a.oct = silverKnob( "arp_oct", 425, 248, 16, a.oct, 1, 4, { step: 1, def: 1, ticks: 4, format: function(v){ return "OCTAVE " + v; } } );
 	[1, 2, 3, 4].forEach(function(n){ t( String( n ), 452, 214 + n * 9, 6.5, a.oct == n ? WHITE : "#8a8a8a", "left", true ); });
 	var cur = ARP_DIV_UI.findIndex(function(d){ return d[1] == a.div || d[2] == a.div; }), trip = ARP_DIV_UI.some(function(d){ return d[2] == a.div; });
@@ -439,14 +562,21 @@ function drawArp()
 	var di = silverKnob( "arp_div", 525, 248, 16, 3 - cur, 0, 3, { step: 1, def: 1, ticks: 4, format: function(v){ return "DIVISION " + ARP_DIV_UI[ 3 - v ][0] + (trip ? "T" : ""); } } );
 	a.div = ARP_DIV_UI[ 3 - di ][ trip ? 2 : 1 ];
 	["1/32", "1/16", "1/8", "1/4"].forEach(function(l, i){ t( l, 500, 214 + i * 9, 6.5, di == 3 - i ? WHITE : "#8a8a8a", "right", true ); });
-	a.swing = silverKnob( "arp_swing", 612, 248, 16, a.swing === undefined ? 50 : a.swing, 50, 75, { def: 50, ticks: 8, format: function(v){ return v < 50.5 ? "SWING OFF" : "SWING " + Math.round( v ) + "%"; } } );
-	["58%", "54%", "52%", "OFF"].forEach(function(l, i){ t( l, 588, 214 + i * 9, 6.5, "#8a8a8a", "right", true ); });
-	["62%", "66%", "70%", "75%"].forEach(function(l, i){ t( l, 638, 214 + i * 9, 6.5, "#8a8a8a", "left", true ); });
+	var si = SWINGS.reduce(function(b, v, i){ return Math.abs( v - a.swing ) < Math.abs( SWINGS[b] - a.swing ) ? i : b; }, 0);
+	var nsi = silverKnob( "arp_swing", 612, 248, 16, si, 0, 7, { step: 1, def: 0, ticks: 8, format: function(v){ return v ? "SWING " + SWINGS[v] + "%" : "SWING OFF"; } } );
+	if(nsi != si) { si = nsi; a.swing = SWINGS[ si ]; } // an older patch keeps its swing until the knob moves
+	["58%", "54%", "52%", "OFF"].forEach(function(l, i){ t( l, 588, 214 + i * 9, 6.5, si == 3 - i ? WHITE : "#8a8a8a", "right", true ); });
+	["62%", "66%", "70%", "75%"].forEach(function(l, i){ t( l, 638, 214 + i * 9, 6.5, si == 4 + i ? WHITE : "#8a8a8a", "left", true ); });
 	["MODE", "OCTAVE", "DIVISION", "SWING"].forEach(function(l, i){ t( l, [325, 425, 525, 612][i], 284, 10, WHITE, "center", true ); });
 	// ON (SHIFT: EDIT), LATCH, TRIPLET, TAP TEMPO
 	if(hyButton( "arp_on", 325, 325, 58, 28, "ON", a.on, "function", sh ? "EDIT: THE ARPEGGIATOR'S PAGE ON MASTER CONTROL" : "THE ARPEGGIATOR ON / OFF" ).clicked)
-	{ if(sh) { M.settings.ui_module = "arp"; M.settings.shift = false; } else a.on = !a.on; }
-	if(hyButton( "arp_latch", 425, 325, 58, 28, "LATCH", a.latch, "function", "LATCH: KEEP PLAYING AFTER THE KEYS ARE RELEASED" ).clicked) a.latch = !a.latch;
+	{ if(sh) { setModule( M.settings, "arp" ); M.settings.shift = false; } else a.on = !a.on; }
+	var sus = !!M.settings.sustain;
+	if(hyButton( "arp_latch", 425, 325, 58, 28, "LATCH", sh ? sus : a.latch, "function", sh ? "SUSTAIN: HOLD THE NOTES PLAYED, LIKE A PEDAL (" + (sus ? "ON" : "OFF") + ")" : "LATCH: KEEP PLAYING AFTER THE KEYS ARE RELEASED" ).clicked)
+	{
+		if(sh) { M.settings.sustain = !sus; M.settings.shift = false; setStatus( "MYSTIC: sustain " + (sus ? "off" : "on") ); }
+		else a.latch = !a.latch;
+	}
 	if(hyButton( "arp_trip", 525, 325, 58, 28, "TRIPLET", trip, "function", "TRIPLET DIVISIONS" ).clicked) a.div = ARP_DIV_UI[ 3 - di ][ trip ? 1 : 2 ];
 	var tp = hyButton( "arp_tap", 612, 325, 58, 28, "TAP\nTEMPO", false, "function", "TAP THE TEMPO: " + Math.round( a.tempo ) + " BPM (MIDI CLOCK / CLOCK IN WIN)" );
 	if(tp.clicked)
@@ -455,7 +585,7 @@ function drawArp()
 		tl.push( now ); held[ M.id + "tap" ] = tl;
 		if(tl.length >= 2) a.tempo = Math.min( 300, Math.max( 30, Math.round( 60000 / ((now - tl[0]) / (tl.length - 1)) ) ) );
 	}
-	t( "EDIT", 325, 347, 7, "#8a8a8a", "center", true ); t( "SUSTAIN", 425, 347, 7, "#8a8a8a", "center", true );
+	t( "EDIT", 325, 347, 7, "#8a8a8a", "center", true ); t( "SUSTAIN", 425, 347, 7, sus ? "#ffb08a" : "#8a8a8a", "center", true );
 }
 
 function drawFilterControls()
@@ -488,15 +618,15 @@ function drawMainSystems()
 	ctx.strokeStyle = "#4a4a50"; ctx.setLineDash && ctx.setLineDash([ 3, 3 ]); ctx.lineWidth = 1;
 	ctx.beginPath(); ctx.moveTo( X(770), Y(66) ); ctx.lineTo( X(770), Y(498) ); ctx.stroke();
 	ctx.setLineDash && ctx.setLineDash([]);
-	var step = function(d) { loadPatch( s, (s.patch + d + PATCHES.length) % PATCHES.length ); s.ui_module = "home"; setStatus( "MYSTIC: " + PATCHES[ s.patch ][0] ); };
+	var step = function(d) { loadPatch( s, ((s.patch + d) % PATCHES.length + PATCHES.length) % PATCHES.length ); setModule( s, "home" ); setStatus( "MYSTIC: " + PATCHES[ s.patch ][0] ); };
 	if(hyButton( "browse", 725, 118, 58, 30, "BROWSE", !!s.ui_browse, "access", "BROWSE THE PATCHES (THE ENCODER SCROLLS)" ).clicked) s.ui_browse = !s.ui_browse;
 	t( "FAVORITE", 725, 143, 7, "#8a8a8a", "center", true );
 	if(hyButton( "save", 725, 200, 58, 30, "SAVE", false, "function", "PATCHES ARE SAVED WITH THE RACK (SESSIONS, SAVE AS)" ).clicked) setStatus( "MYSTIC: the sound is saved with the rack (sessions, Save as…)" );
-	if(hyButton( "sysset", 725, 258, 58, 30, "SYSTEM\nSETUP", s.ui_module == "voice", "access", "SYSTEM SETUP: THE VOICE PAGE" ).clicked) s.ui_module = "voice";
+	if(hyButton( "sysset", 725, 258, 58, 30, "SYSTEM\nSETUP", s.ui_module == "voice", "access", "SYSTEM SETUP: THE VOICE PAGE" ).clicked) setModule( s, "voice" );
 	if(hyButton( "init", 725, 330, 58, 30, "INIT", false, "function", sh ? "INIT THE PATCH" : "INIT THE MODULE ON MASTER CONTROL (SHIFT: THE PATCH)" ).clicked)
 	{
 		if(sh || s.ui_module == "home") { loadPatch( s, 0 ); s.shift = false; setStatus( "MYSTIC: patch initialized" ); }
-		else (MODULES[ s.ui_module ] || MODULES.home).params().forEach(function(p){ if(p.o.def !== undefined) p.set( s, p.o.def ); });
+		else (MODULES[ s.ui_module ] || MODULES.home).params().forEach(function(p){ if(p && p.o.def !== undefined) p.set( s, p.o.def ); });
 	}
 	if(hyButton( "random", 725, 381, 58, 30, "RANDOM", false, "function", "A RANDOM SOUND" ).clicked) { randomize( s ); setStatus( "MYSTIC: random sound" ); }
 	if(hyButton( "shift", 725, 462, 58, 30, "SHIFT", sh, "function", "SHIFT: THE PADS' SCALE FUNCTIONS, ARP EDIT, PANIC, INIT PATCH" ).clicked) s.shift = !sh;
@@ -507,7 +637,13 @@ function drawMainSystems()
 	if(hover && ui.pressed && ui.active === null) { ui.active = id; e.y = ui.y; }
 	if(ui.active === id && ui.down) { var d = Math.trunc( (e.y - ui.y) / 14 ); if(d) { step( d ); e.y -= d * 14; e.a += d * 0.1; } }
 	if(hover && ui.wheel && ui.active === null) { var dw = ui.wheel > 0 ? -1 : 1; step( dw ); e.a += dw * 0.1; ui.wheel = 0; }
-	ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.arc( cx, cy, R + Sz(6), 0, Math.PI * 2 ); ctx.fill();
+	ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.arc( cx, cy, R + Sz(9), 0, Math.PI * 2 ); ctx.fill();
+	// the light ring around it, in the colour of the patch's category
+	var rc = CAT_COLORS[ (PATCHES[ s.patch ] || PATCHES[0])[1] ] || "#4a7dff";
+	ctx.save(); ctx.shadowColor = rc; ctx.shadowBlur = 10;
+	ctx.strokeStyle = rc; ctx.lineWidth = Sz(4); ctx.beginPath(); ctx.arc( cx, cy, R + Sz(5), 0, Math.PI * 2 ); ctx.stroke();
+	ctx.restore();
+	ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.arc( cx, cy, R + Sz(2.5), 0, Math.PI * 2 ); ctx.fill();
 	var g = ctx.createRadialGradient( cx - R * 0.3, cy - R * 0.35, R * 0.05, cx, cy, R );
 	g.addColorStop( 0, "#ffffff" ); g.addColorStop( 0.55, hover ? "#d2d5d8" : "#bcc0c4" ); g.addColorStop( 1, "#6a6d72" );
 	ctx.fillStyle = g; ctx.beginPath(); ctx.arc( cx, cy, R, 0, Math.PI * 2 ); ctx.fill();
@@ -516,13 +652,13 @@ function drawMainSystems()
 	ctx.fillStyle = "#3a3a3a"; ctx.beginPath(); ctx.arc( cx + Math.cos( e.a * 6.28 - 1.57 ) * R * 0.7, cy + Math.sin( e.a * 6.28 - 1.57 ) * R * 0.7, Sz(4), 0, Math.PI * 2 ); ctx.fill();
 	// the left OLED
 	drawLeftOled( X(785), Y(240), Sz(130), Sz(100) );
-	if(hyButton( "prev", 815, 380, 46, 28, "◀", false, "function", "THE PREVIOUS PATCH" ).clicked) step( -1 );
-	if(hyButton( "next", 885, 380, 46, 28, "▶", false, "function", "THE NEXT PATCH" ).clicked) step( 1 );
-	t( "-1", 815, 405, 7, "#8a8a8a", "center", true ); t( "+1", 885, 405, 7, "#8a8a8a", "center", true );
+	if(hyButton( "prev", 815, 380, 46, 28, "◀", false, "function", sh ? "10 PATCHES BACK" : "THE PREVIOUS PATCH" ).clicked) { step( sh ? -10 : -1 ); s.shift = false; }
+	if(hyButton( "next", 885, 380, 46, 28, "▶", false, "function", sh ? "10 PATCHES ON" : "THE NEXT PATCH" ).clicked) { step( sh ? 10 : 1 ); s.shift = false; }
+	t( "-10", 815, 405, 7, "#8a8a8a", "center", true ); t( "+10", 885, 405, 7, "#8a8a8a", "center", true );
 	if(hyButton( "home", 850, 462, 120, 30, "HOME", s.ui_module == "home", "function", sh ? "PANIC: ALL NOTES OFF" : "HOME: THE MACROS ON MASTER CONTROL" ).clicked)
 	{
 		if(sh) { send({ type: "allNotesOff" }); s.shift = false; setStatus( "MYSTIC: all notes off" ); }
-		else { s.ui_module = "home"; s.ui_browse = false; }
+		else setModule( s, "home" );
 	}
 	t( "PANIC", 850, 489, 7, "#8a8a8a", "center", true );
 }
@@ -561,18 +697,53 @@ function drawLeftOled( x, y, w, h )
 		oledText( (st.voices || 0) + "/8 VOICES  " + Math.round( s.arp.tempo ) + "BPM", x + w / 2, y + h - 15, d, OLED, "center" );
 		return;
 	}
-	var mod = MODULES[ s.ui_module ] || MODULES.home;
+	var mod = MODULES[ s.ui_module ] || MODULES.home, k = s.ui_module, pages = pageCount( k );
 	oledText( fitText( mod.name, 15 ), x + 6, y + 7, Sz(1.4) );
-	oledText( "PAGE 1/1", x + w - 6, y + h - 12, d, "#9aa6b8", "right" );
+	oledText( "PAGE " + (s.ui_page + 1) + "/" + pages, x + w - 6, y + h - 12, d, "#9aa6b8", "right" );
+	var line = function(pts){ ctx.strokeStyle = OLED; ctx.lineWidth = 1.4; ctx.beginPath(); pts.forEach(function(p, i){ i ? ctx.lineTo( p[0], p[1] ) : ctx.moveTo( p[0], p[1] ); }); ctx.stroke(); };
+	var gx = x + 8, gw = w - 16, gy = y + 24, gh = h - 44;
 	// the oscillator and mutant pages draw the wave they make
-	var o = { osc1: 0, mut1: 0, mut2: 0, osc2: 1, mut3: 1, mut4: 1 }[ s.ui_module ];
+	var o = { osc1: 0, mut1: 0, mut2: 0, osc2: 1, mut3: 1, mut4: 1 }[ k ];
 	var pts = o !== undefined && st.wave ? st.wave[o] : null;
-	if(pts)
+	if(pts) line( pts.map(function(v, i){ return [ gx + i / (pts.length - 1) * gw, y + h * 0.55 - Math.max( -1.2, Math.min( 1.2, v ) ) * h * 0.24 ]; }) );
+	else if(/^env\d$/.test( k ) || k == "amp")
 	{
-		ctx.strokeStyle = OLED; ctx.lineWidth = 1.4;
-		ctx.beginPath();
-		pts.forEach(function(v, i){ var px = x + 8 + i / (pts.length - 1) * (w - 16), py = y + h * 0.55 - Math.max( -1.2, Math.min( 1.2, v ) ) * h * 0.24; i ? ctx.lineTo( px, py ) : ctx.moveTo( px, py ); });
-		ctx.stroke();
+		// the envelope: delay, attack, hold, decay, a stretch of sustain, release (times on a square root scale)
+		var e = s[ k == "amp" ? "env2" : k ], q = function(v){ return Math.sqrt( Math.max( 0, v ) ); };
+		var seg = [q( e.dl ), q( e.a ), q( e.h ), q( e.d ), 0.8, q( e.r )], tot = seg.reduce(function(a, b){ return a + b; }, 0) || 1;
+		var X0 = gx, lv = [0, 1, 1, e.s, e.s, 0], P2 = [[X0, gy + gh]];
+		seg.forEach(function(v, i){ X0 += v / tot * gw; P2.push([ X0, gy + gh - lv[i] * gh ]); });
+		line( P2 );
+		if(e.loop) oledText( "LOOP", gx + gw, gy - 2, d, OLED, "right" );
+	}
+	else if(/^lfo\d$/.test( k ))
+	{
+		var l = k == "lfo1" ? s.lfo : s.lfos[ +k[3] - 2 ], sh2 = l.shape, P3 = [];
+		for(var i = 0; i <= 64; ++i)
+		{
+			var ph = (i / 64 * 2) % 1, v = sh2 == "tri" ? 1 - 4 * Math.abs( ph - 0.5 ) : sh2 == "saw" ? 1 - 2 * ph : sh2 == "ramp" ? 2 * ph - 1 :
+				sh2 == "square" ? (ph < 0.5 ? 1 : -1) : sh2 == "sh" ? [0.6, -0.4, 0.9, -0.8][ Math.floor( i / 16 ) % 4 ] : sh2 == "smooth" ? Math.sin( i / 64 * 9 ) * 0.7 : Math.sin( ph * Math.PI * 2 );
+			P3.push([ gx + i / 64 * gw, gy + gh / 2 - v * l.gain * gh * 0.45 ]);
+		}
+		line( P3 );
+		var lv2 = st.lfos ? st.lfos[ +k[3] - 1 ] : 0;
+		ctx.fillStyle = OLED; ctx.fillRect( gx + gw - 4, gy + gh / 2 - lv2 * gh * 0.45 - 2, 4, 4 );
+	}
+	else if(k == "modmatrix")
+	{
+		// the page's two slots in words, and how many are in use
+		for(var j = 0; j < 2; ++j)
+		{
+			var n = s.ui_page * 2 + j, m = s.matrix[n], src = MOD_SRC.find(function(o2){ return o2[0] == m.src; }), dst = MOD_DST.find(function(o2){ return o2[0] == m.dst; });
+			oledText( (n + 1) + " " + (m.src == "off" || m.dst == "off" ? "-" : src[1] + ">" + dst[1]), x + 6, y + 28 + j * 16, d );
+		}
+		oledText( s.matrix.filter(function(m2){ return m2.src != "off" && m2.dst != "off" && m2.amt; }).length + "/16 IN USE", x + 6, y + 62, d, "#9aa6b8" );
+	}
+	else if(k == "macro")
+	{
+		var mc = s.macros[ s.ui_page ];
+		oledText( "MACRO " + (s.ui_page + 1) + " " + fP( mc.v ), x + 6, y + 28, d );
+		mc.t.forEach(function(t2, j){ if(t2.d != "off") oledText( ">" + dstName( t2.d ) + " " + fS( t2.a ), x + 6, y + 44 + j * 12, d ); });
 	}
 	else oledText( fitText( "A" + String( 1 + s.patch ).padStart( 3, "0" ) + " " + name[0], 17 ), x + 6, y + 30, d );
 }
@@ -581,7 +752,9 @@ function drawLeftOled( x, y, w, h )
 // windows; EXIT (home), VOICE, PAGE (the previous / next module), MACRO ASSIGN, MOD MATRIX
 function drawMasterControl()
 {
-	var s = M.settings, mod = MODULES[ s.ui_module ] || MODULES.home, params = mod.params();
+	var s = M.settings, mod = MODULES[ s.ui_module ] || MODULES.home, pages = pageCount( s.ui_module );
+	if(s.ui_page >= pages) s.ui_page = pages - 1;
+	var params = mod.params().slice( s.ui_page * 8, s.ui_page * 8 + 8 );
 	section( "MASTER CONTROL", 945, 32, 1470, 505 );
 	var cols = [1005, 1090, 1178, 1265];
 	// the OLED band: four windows, a reflection across
@@ -622,18 +795,26 @@ function drawMasterControl()
 	ctx.beginPath(); ctx.moveTo( bx, by ); ctx.lineTo( bx + bw * 0.62, by ); ctx.lineTo( bx + bw * 0.46, by + bh ); ctx.lineTo( bx, by + bh ); ctx.fill();
 	ctx.restore();
 	var i = MODULE_ORDER.indexOf( s.ui_module );
-	if(hyButton( "exit", 1408, 118, 50, 28, "EXIT", false, "function", "EXIT: HOME" ).clicked) { s.ui_module = "home"; s.ui_browse = false; }
-	if(hyButton( "voice", 1408, 198, 50, 28, "VOICE", s.ui_module == "voice", "access", "THE VOICE PAGE: POLYPHONY, GLIDE" ).clicked) s.ui_module = "voice";
+	if(hyButton( "exit", 1408, 118, 50, 28, "EXIT", false, "function", "EXIT: HOME" ).clicked) setModule( s, "home" );
+	if(hyButton( "voice", 1408, 198, 50, 28, "VOICE", s.ui_module == "voice", "access", "THE VOICE PAGE: POLYPHONY, GLIDE, WIDTH, SUSTAIN" ).clicked) setModule( s, "voice" );
 	ctx.fillStyle = "#000"; ctx.fillRect( X(1378), Y(238), Sz(60), Sz(104) );
-	if(hyButton( "page_up", 1408, 258, 44, 26, "▲", false, "function", "THE PREVIOUS PAGE" ).clicked) s.ui_module = MODULE_ORDER[ (i + MODULE_ORDER.length - 1) % MODULE_ORDER.length ];
-	if(hyButton( "page_down", 1408, 300, 44, 26, "▼", false, "function", "THE NEXT PAGE" ).clicked) s.ui_module = MODULE_ORDER[ (i + 1) % MODULE_ORDER.length ];
+	// PAGE: through the module's pages, then on to the next module
+	if(hyButton( "page_up", 1408, 258, 44, 26, "▲", false, "function", "THE PREVIOUS PAGE" ).clicked)
+	{
+		if(s.ui_page > 0) s.ui_page--;
+		else { var k = MODULE_ORDER[ (i + MODULE_ORDER.length - 1) % MODULE_ORDER.length ]; setModule( s, k, pageCount( k ) - 1 ); }
+	}
+	if(hyButton( "page_down", 1408, 300, 44, 26, "▼", false, "function", "THE NEXT PAGE" ).clicked)
+	{
+		if(s.ui_page < pages - 1) s.ui_page++;
+		else setModule( s, MODULE_ORDER[ (i + 1) % MODULE_ORDER.length ] );
+	}
 	t( "PAGE", 1408, 330, 9, WHITE, "center", true );
-	if(hyButton( "macro", 1408, 380, 50, 30, "MACRO\nASSIGN", s.ui_module == "home", "access", "THE MACROS (HOME)" ).clicked) s.ui_module = "home";
-	if(hyButton( "modmatrix", 1408, 462, 50, 30, "MOD\nMATRIX", s.ui_module == "modmatrix", "access", "MOD MATRIX: THE MODULATION AMOUNTS" ).clicked) s.ui_module = "modmatrix";
+	if(hyButton( "macro", 1408, 380, 50, 30, "MACRO\nASSIGN", s.ui_module == "macro", "access", "MACRO ASSIGN: THE TARGETS OF EACH MACRO (PAGE: THE NEXT MACRO)" ).clicked) setModule( s, "macro" );
+	if(hyButton( "modmatrix", 1408, 462, 50, 30, "MOD\nMATRIX", s.ui_module == "modmatrix", "access", "MOD MATRIX: 16 SLOTS, SOURCE > DESTINATION (PAGE: THE NEXT TWO)" ).clicked) setModule( s, "modmatrix" );
 }
 
-// MODULE SELECT: the signal flow; a button shows its module on MASTER CONTROL. The modules this
-// synth does not have are dimmed
+// MODULE SELECT: the signal flow; a button shows its module on MASTER CONTROL
 function drawModuleSelect()
 {
 	var s = M.settings;
@@ -643,7 +824,7 @@ function drawModuleSelect()
 	t( "MODULE SELECT", 160, 537.5, 13, RED, "center", true );
 	var B = function(k, x, y, label, missing) {
 		var r = hyButton( "mod_" + k, x, y, 56, 30, label, s.ui_module == k, "access", missing ? label.replace( "\n", " " ) + ": NOT HERE" : (MODULES[k] || {}).name + " ON MASTER CONTROL", missing );
-		if(!missing && r.clicked) { s.ui_module = k; s.ui_browse = false; }
+		if(!missing && r.clicked) setModule( s, k );
 	};
 	ctx.strokeStyle = "#5a5a60"; ctx.lineWidth = Sz(3);
 	var L = function(pts){ ctx.beginPath(); pts.forEach(function(p, i){ i ? ctx.lineTo( X(p[0]), Y(p[1]) ) : ctx.moveTo( X(p[0]), Y(p[1]) ); }); ctx.stroke(); };
@@ -658,10 +839,10 @@ function drawModuleSelect()
 	B( "osc1", 103, 585, "OSC\n1" ); B( "mut1", 180, 585, "MUTANT\n1" ); B( "mut2", 265, 585, "MUTANT\n2" );
 	B( "osc2", 103, 634, "OSC\n2" ); B( "mut3", 180, 634, "MUTANT\n3" ); B( "mut4", 265, 634, "MUTANT\n4" );
 	B( "osc3", 103, 684, "OSC\n3" ); B( "ring", 265, 684, "RING-\nNOISE" ); B( "mixer", 333, 634, "MIXER" );
-	B( "env1", 420, 553, "ENV\n1" ); B( "env2", 497, 553, "ENV\n2" ); B( "env3", 575, 553, "ENV\n3" ); B( "env4", 652, 553, "ENV\n4", true ); B( "env5", 730, 553, "ENV\n5", true );
+	B( "env1", 420, 553, "ENV\n1" ); B( "env2", 497, 553, "ENV\n2" ); B( "env3", 575, 553, "ENV\n3" ); B( "env4", 652, 553, "ENV\n4" ); B( "env5", 730, 553, "ENV\n5" );
 	B( "filter1", 420, 610, "FILTER\n1" ); B( "filter2", 420, 657, "FILTER\n2" ); B( "amp", 497, 634, "AMP" );
-	B( "prefx", 575, 634, "PRE-FX", true ); B( "delay", 652, 610, "DELAY" ); B( "reverb", 652, 657, "REVERB" ); B( "postfx", 730, 634, "POST-FX", true );
-	B( "lfo1", 420, 712, "LFO\n1" ); B( "lfo2", 497, 712, "LFO\n2", true ); B( "lfo3", 575, 712, "LFO\n3", true ); B( "lfo4", 652, 712, "LFO\n4", true ); B( "lfo5", 730, 712, "LFO\n5", true );
+	B( "prefx", 575, 634, "PRE-FX" ); B( "delay", 652, 610, "DELAY" ); B( "reverb", 652, 657, "REVERB" ); B( "postfx", 730, 634, "POST-FX" );
+	B( "lfo1", 420, 712, "LFO\n1" ); B( "lfo2", 497, 712, "LFO\n2" ); B( "lfo3", 575, 712, "LFO\n3" ); B( "lfo4", 652, 712, "LFO\n4" ); B( "lfo5", 730, 712, "LFO\n5" );
 }
 
 // the 24 pads: notes of the scale (CHORDS: triads); with SHIFT, what is printed under them
@@ -726,7 +907,7 @@ function send( msg ) { var m = M; act(function(){ m.post( msg ); }); }
 WR.registerSynth( "mystic", {
 	title: "MYSTIC",
 	description: "MYSTIC: polyphonic wave morphing synthesizer with mutators",
-	about: "8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.",
+	about: "8 voices, wave-scanning oscillators with mutants, two filters, five envelopes and LFOs, a 16 slot mod matrix, 8 macros, four effects in stereo, an arpeggiator. Edit pages around an OLED.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^pad\\d_\\d$", 3], ["^(arp_on|arp_latch|arp_tap|home|prev|next)$", 2], ["^(shift|random|arp_trip|filt[12]|page_up|page_down|exit)$", 1], ["^mod_", 1], ["^(encbtn\\d|save|sysset|browse|init|macro|modmatrix|voice)$", 0]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
@@ -734,8 +915,9 @@ WR.registerSynth( "mystic", {
 	category: "Synths",
 	worklet: "devices/mystic-worklet.js",
 	jacks: JACKS,
-	rear_jacks: [["AUDIO OUT", "aout", "audio"]],
-	audio_out: "audio",
+	rear_jacks: [["OUT L", "aout", "audio"], ["OUT R", "aout", "audio_r"]],
+	audio_out: "audio",       // cabled into the rack in stereo when it is added
+	audio_out_r: "audio_r",
 	midi_in: "midi_in",
 	knob_skin: "ledring",
 	defaults: defaults,
@@ -744,7 +926,7 @@ WR.registerSynth( "mystic", {
 	size: function() { return SIZE; },
 	draw: function( mod ) {
 		M = mod;
-		M.state = M.state || { voices: 0, gates: [], lfo: 0, arp: [], wave: null };
+		M.state = M.state || { voices: 0, gates: [], lfo: 0, lfos: [], arp: [], wave: null };
 		drawPanel();
 		M = null;
 	},

@@ -25,7 +25,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/dram.js`, `app/devices/dram-worklet.js` | the DRAM |
 | `app/devices/b32.js`, `app/devices/b32-worklet.js` | the Brother-32 |
 | `app/devices/maze.js`, `app/devices/maze-worklet.js` | the Maze |
-| `app/devices/mystic.js`, `app/devices/mystic-worklet.js` | the Mystic (polyphonic) |
+| `app/devices/mystic.js`, `app/devices/mystic-worklet.js` | the Mystic (polyphonic, with a mod matrix) |
 | `app/devices/llmdram.js`, `app/devices/llmdram-worklet.js` | the LLM Dram drum machine |
 | `app/devices/lunar.js`, `app/devices/lunar-worklet.js` | the Lunar 21 drone machine |
 | `app/previews/`, `tools/make-previews.sh` | the devices' pictures for ADD DEVICE, and the script that makes them |
@@ -277,21 +277,20 @@ A classic analog synthesizer design with four oscillators, played as one voice o
 
 ## Mystic
 
-A wave-scanning polyphonic synthesizer. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device, the song sequencer or its own pads.
+A wave-scanning polyphonic synthesizer. It plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device, the song sequencer or its own pads. OUT L / OUT R are on the back.
 
 - **Panel:** laid out in sections. It has a matte black panel with red section titles, silver knobs, LED ring encoders, aluminium end cheeks, orange-lettered access buttons and white-lettered function buttons. The screens are white dot matrix OLEDs (a 5×7 font).
   - **CV / GATE:** inputs MOD 1 (cutoff), MOD 2 (WAVSCAN), PITCH, GATE and CLOCK; outputs PITCH, GATE, MOD 1 (ENV 1), MOD 2 (LFO 1), ENV 3 and CLOCK (a pulse on each arpeggiator step).
-  - **ARPEGGIATOR:** MODE, OCTAVE, DIVISION (1/4 to 1/32) and SWING; ON, LATCH, TRIPLET and TAP TEMPO. SHIFT + ON (EDIT) shows its page.
+  - **ARPEGGIATOR:** MODE (8 positions, printed around it), OCTAVE, DIVISION (1/4 to 1/32) and SWING (OFF, 52% ... 75%); ON, LATCH, TRIPLET and TAP TEMPO. SHIFT + ON (EDIT) shows its pages; SHIFT + LATCH is **SUSTAIN**: notes let go keep sounding, like a held pedal, until SUSTAIN goes off.
   - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE / MORPH, on FILTER 1 or FILTER 2.
   - **MAIN SYSTEMS:**
-    - **Patch encoder and ◀ ▶:** step through the built-in patches (INIT, Glass Pad, FM Bells, Mutant Arp, Supersaw Stack, Vowel Choir, Sub Bass, Comb Pluck). The left OLED shows the patch, or the module being edited (with its wave for the oscillators and mutants), or the BROWSE list.
+    - **Patch encoder and ◀ ▶:** step through the built-in patches (SHIFT + ◀ ▶: 10 at a time). The ring around the encoder lights in the colour of the patch's category. The left OLED shows the patch, or the module being edited: the wave of the oscillators and mutants, the curve of an envelope, the wave of an LFO with its position, the mod matrix slots in words. The PAGE count is in its corner.
     - **Buttons:** INIT resets the module shown (SHIFT: the whole patch) and RANDOM makes a random sound. HOME shows the 8 macros (SHIFT + HOME: PANIC).
   - **MASTER CONTROL:** 8 encoders around four OLED windows (a parameter's name and value above and below a line) edit the module picked.
-    - **Buttons:** the white buttons reset their parameter. PAGE ▲ ▼ steps through the pages, EXIT goes home, and VOICE shows polyphony and glide. MOD MATRIX shows the modulation amounts.
-  - **MODULE SELECT:** the signal flow. ENV 4–5, LFO 2–5, PRE-FX and POST-FX, which it does not have, are dimmed.
+    - **Buttons:** the white buttons reset their parameter. PAGE ▲ ▼ steps through the module's pages, then on to the next module. EXIT goes home, VOICE shows polyphony, glide, WIDTH and SUSTAIN. MACRO ASSIGN and MOD MATRIX open those pages.
+  - **MODULE SELECT:** the signal flow; every module on it has its page.
   - **24 pads:** play the notes of a scale (CHORDS mode: triads); roots are tinted. With SHIFT they do what is printed under them: OCT − / +, PAD MODE, KEY, and the 16 scales.
-- **DELAY and REVERB** after the amp: DELAY has TIME, FEEDBACK, WET TONE and DRY/WET; REVERB has TIME, TONE and DRY/WET.
-- **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
+- **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT. Each wave is kept in 7 versions with fewer and fewer harmonics, and the oscillator picks the one that fits its pitch, so high notes don't alias.
 - **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTANT 1–4 on the panel), each with a mode, RATIO, DEPTH and DRY/WET:
   - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.
   - **WAVSTACK:** three detuned copies; RATIO sets the spread.
@@ -300,18 +299,24 @@ A wave-scanning polyphonic synthesizer. It is the rack's only **polyphonic** syn
   - **HARMONIC:** sweeps to the upper harmonics.
   - **PHAZDIST:** phase distortion.
 - **OSC 3:** one wave, with SEMI and CENT.
-- **Mixer:** OSC 1–3, RING MOD (OSC 1 × OSC 2) and NOISE.
-- **FILTER 1:** LP LADDER 24, LP 12, BAND PASS, HIGH PASS, VOWEL (two formants, CUTOFF moves through A E I O U) or COMB. It has CUTOFF, RESONANCE (feedback for COMB), DRIVE, ENV 1 AMT and KEYTRACK.
-- **FILTER 2:** a state-variable filter whose MORPH goes low pass → band pass → high pass, with CUTOFF and RESONANCE. **ROUTING** puts the filters in series or parallel.
-- **Envelopes:**
-  - **AMP ENV** (ADSR, with VELOCITY sensitivity).
-  - **FILTER ENV (ENV 1)** (ADSR).
-  - **MOD ENV (ENV 3)** (attack / decay), sent to the mutators' depth and to WAVSCAN.
-- **LFO:** RATE, SHAPE (SINE, TRIANGLE, SAW, SQUARE, S&H), sent to PITCH, WAVSCAN, CUTOFF and MUTATORS.
-- **ARPEGGIATOR:** UP, DOWN, UP/DOWN, RANDOM or AS PLAYED, with DIVISION (1/4 to 1/32), OCTAVES (1–4), GATE, LATCH and TEMPO. MIDI clock (or a cable in CLOCK) takes over from TEMPO.
-- **Factory patches:** *Glass Pad*, *FM Bells* and *Mutant Arp*.
-- **Simplified:** no mod matrix, assignable macros, ENV 4–5, LFO 2–5, pre / post effects, and patch saving inside the synth are replaced by the fixed routings and pages above; the waves are 8 instead of 219.
-- **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking.
+- **Mixer:** OSC 1–3, RING MOD (OSC 1 × OSC 2) and NOISE. **WIDTH** spreads the voices from left to right (0: all in the middle).
+- **FILTER 1:** LP LADDER 24, LP 12, BAND PASS, HIGH PASS, VOWEL (two formants, CUTOFF moves through A E I O U) or COMB. It has CUTOFF, RESONANCE (feedback for COMB), DRIVE, ENV 1 AMT, LFO 1 AMT and KEYTRACK.
+- **FILTER 2:** a state-variable filter whose MORPH goes low pass → band pass → high pass, with CUTOFF, RESONANCE, ENV 1 AMT and LFO 1 AMT. **ROUTING** puts the filters in series or parallel.
+- **Envelopes:** five, each with DELAY, ATTACK, HOLD, DECAY, SUSTAIN, RELEASE and LOOP (on: while the note is held, it starts again each time it reaches the sustain). ENV 1 goes to the filters, ENV 2 is the amp (with VELOCITY), ENV 3 goes to the mutators' depth and to WAVSCAN; ENV 4 and ENV 5 reach things through the mod matrix.
+- **LFOs:** five, for all voices, each with RATE, WAVE (SINE, TRIANGLE, SAW DOWN, SAW UP, SQUARE, S&H, SMOOTH random), GAIN and TRIG (FREE, or NOTE: it starts again with the first note played). LFO 1 goes to pitch, WAVSCAN, the filters and the mutators; LFO 2 to the amp (tremolo); LFO 3–5 through the mod matrix.
+- **MOD MATRIX:** 16 slots of SOURCE, DESTINATION and DEPTH (±100%), two a page.
+  - Sources: ENV 1–5, LFO 1–5, velocity, keytrack, mod wheel (MIDI CC 1), aftertouch (MIDI channel pressure), RANDOM (a new value each note), the CV MOD 1 / MOD 2 inputs and the 8 macros.
+  - Destinations: pitch (all oscillators or one), WAVSCAN 1–2, the mutants' depth, the five mixer volumes, both filters' cutoff and resonance, DRIVE, MORPH, the amp level, pan, the dry/wet of PRE-FX, POST-FX, DELAY and REVERB, the delay's feedback, and the rate of each LFO. At 100%, pitch moves an octave and a cutoff 8 octaves.
+  - The effects and the LFO rates are shared by all voices: envelopes, velocity, keytrack and RANDOM reach them from the last note played.
+- **Macros:** 8 knobs on HOME, each with 3 targets (any destination of the matrix) and a depth for each, set on the MACRO ASSIGN pages (one macro a page). HOME names each knob after its first target. A new patch has them on CUT 1, RES 1, SCAN 1, SCAN 2, MUT 1, MUT 3, DLY MIX and REV MIX.
+- **Effects:** PRE-FX → DELAY → REVERB → POST-FX, in stereo.
+  - **PRE-FX and POST-FX:** TYPE, two parameters and DRY/WET. CHORUS (RATE, DEPTH), FLANGER (RATE, FEEDBACK), PHASER (RATE, FEEDBACK), TREMOLO (RATE, DEPTH, the sides half a turn apart), LO-FI (BITS, DOWNSAMPLE), DISTORT (DRIVE, TONE) and COMPRESS (AMOUNT, RELEASE).
+  - **DELAY:** TIME, FEEDBACK, WET TONE and DRY/WET. **REVERB:** TIME, TONE and DRY/WET.
+- **ARPEGGIATOR:** UP, DOWN, UP/DOWN, UP & DOWN (the top and bottom notes twice), AS PLAYED, RANDOM, CHORD (all the notes at once, an octave up each step through OCTAVES) or PHRASE (hold two or more keys: that is the phrase; then one key plays it from that note). DIVISION (1/4 to 1/32), OCTAVES (1–4), GATE, LATCH, TEMPO, and on its second page RATCHET (each step played 1 to 4 times) and CHANCE (how often a step plays). MIDI clock (or a cable in CLOCK) takes over from TEMPO.
+- **Built-in patches:** INIT, Glass Pad, FM Bells, Mutant Arp, Supersaw Stack, Vowel Choir, Sub Bass, Comb Pluck, Loop Pulse (ENV 4 looping on the cutoff), Chorus Strings, Phase Keys, Wobble Bass (the mod wheel speeds up LFO 3) and Ratchet Chords (CHORD mode with ratchets, chance and LO-FI).
+- **Factory patches:** *Glass Pad*, *FM Bells*, *Mutant Arp*, *Vowel Choir*, *Chorus Strings* and *Ratchet Chords*.
+- **Simplified:** the waves are 8 instead of 219, each LFO runs once for all voices, the effects have one type each with two parameters, and patches are saved with the rack, not inside the synth.
+- **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking; the envelopes, LFOs and the matrix add about 10%.
 
 ## Universe
 
@@ -630,6 +635,7 @@ MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, a **M
 - **Keys:** the same selector under the keys' MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
 - **A device's MIDI OUT** (the MIDI FX): its notes go only to the devices cabled from it, whatever channel they listen to. A device fed only that way doesn't hear the keys. One MIDI OUT can feed several devices; a MIDI IN takes one cable.
 - **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
+- **Controllers:** pitch bend, the mod wheel (CC 1) and channel aftertouch from a MIDI device reach the synths on their channel, and pass through the MIDI FX. The MYSTIC uses the mod wheel and aftertouch as sources of its mod matrix; the other devices ignore them.
 
 ## Keys device and MIDI
 
@@ -656,7 +662,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 54 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 56 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
