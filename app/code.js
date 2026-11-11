@@ -3170,7 +3170,16 @@ $("power").addEventListener("click", function(){
 	if(!rack.context)
 		ensureAudio();
 	else if(rack.context.state == "running")
+	{
+		// a panic button: every note off, every sequencer and the song stopped, then the audio stops;
+		// it comes back silent
+		pianoAllOff();
+		rack.allNotesOff();
+		rack.transport( "play", false );
+		if(window.SEQ && SEQ.play.on) SEQ.stop();
 		rack.context.suspend().then( updateToolbar );
+		setStatus( "Audio off: all notes off and every sequencer stopped" );
+	}
 	else
 		rack.context.resume().then( updateToolbar );
 });

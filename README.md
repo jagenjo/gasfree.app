@@ -109,6 +109,7 @@ The page is a rack. From the top:
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
+- **Audio on** (toolbar) starts the audio. Clicking it while on is a panic button: every note is released, every sequencer and the song stop, and the audio is suspended, so it comes back silent.
 - **CPU** (toolbar, next to *Audio on*): how much of the real time the audio engine takes to make the sound, measured in the audio thread and updated twice a second: 50% means half a second of work for each second of sound. The bar behind it turns amber over 60% and red over 85%; near 100% the sound breaks up. It counts every device's DSP, not the reverbs' native nodes or the browser's own audio work. Where the audio thread has no fine clock (Chrome), it times in whole milliseconds and the half second of blocks averages the rounding out.
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).

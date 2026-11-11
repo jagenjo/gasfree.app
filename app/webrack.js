@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261111k"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261111l"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -633,7 +633,7 @@ WRContext.prototype.moveModule = function( id, dir )
 WRContext.prototype.transport = function( action, value )
 {
 	var mods = this.flatModules().map( this.panelModule, this );
-	if(action == "play")
+	if(action == "play" && value === undefined) // no value: toggle
 		value = !mods.some(function(m){ return m.state && m.state.playing; });
 	mods.forEach(function(m){
 		if(m.def.transport)
