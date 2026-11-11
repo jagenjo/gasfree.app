@@ -117,17 +117,115 @@ function randomize( s, r )
 	});
 }
 
-// a prompt after this frame (a dialog in the middle of the draw loop would lose the pointer release)
-function askText( question, value, done )
+// ---------------------------------------------------------------------------
+// SETTINGS: a panel on the page (HTML, so the names are typed in input fields) with the name, the
+// macros' and buttons' names, the colour and the knob style. One at a time; it follows the module
+// by id, and closes when it is gone
+
+var settings_el = null, settings_id = null, settings_fields = null;
+
+function el( tag, cls, text )
 {
-	var win = scopeWindow();
-	setTimeout(function(){
-		ui.down = false;
-		ui.active = null;
-		var t = win.prompt( question, value );
-		if(t !== null) done( t );
-	}, 0);
+	var e = document.createElement( tag );
+	if(cls) e.className = cls;
+	if(text) e.textContent = text;
+	return e;
 }
+
+function settingsModule() { return settings_id && MAIN_RACK.settings.modules.find(function(o){ return o.id == settings_id; }); }
+
+// a text field for one of the names: the settings follow as you type
+function nameField( parent, value, max, set )
+{
+	var inp = el( "input" );
+	inp.type = "text";
+	inp.maxLength = max;
+	inp.spellcheck = false;
+	inp.value = value;
+	inp.addEventListener( "input", function(){ set( inp.value ); } );
+	inp.addEventListener( "keydown", function(e){
+		if(e.key == "Enter" || e.key == "Escape") { e.preventDefault(); inp.blur(); if(e.key == "Escape") closeSettings(); }
+		e.stopPropagation();
+	} );
+	inp.addEventListener( "keyup", function(e){ e.stopPropagation(); } );
+	parent.appendChild( inp );
+	return inp;
+}
+
+function openSettings( id, focus )
+{
+	closeSettings();
+	var m = MAIN_RACK.settings.modules.find(function(o){ return o.id == id; });
+	if(!m) return;
+	var s = m.settings, root = settings_el = el( "div" );
+	root.id = "subrack-panel";
+	settings_id = id;
+	settings_fields = { labels: [], blabels: [], swatches: [] };
+	root.addEventListener( "click", function(e){ e.stopPropagation(); } );
+	root.addEventListener( "pointerdown", function(e){ e.stopPropagation(); } );
+	root.appendChild( el( "h3", null, "SUBRACK SETTINGS (" + id.toUpperCase() + ")" ) );
+
+	root.appendChild( el( "div", "sec", "NAME" ) );
+	settings_fields.name = nameField( root, s.name, NAME_MAX, function(v){ var m = settingsModule(); if(m) m.settings.name = cleanText( v, NAME_MAX, "SUBRACK" ); } );
+
+	[["MACRO NAMES", "labels", "MACRO "], ["BUTTON NAMES", "blabels", "BUTTON "]].forEach(function(g){
+		root.appendChild( el( "div", "sec", g[0] ) );
+		var grid = el( "div", "grid" );
+		root.appendChild( grid );
+		for(var k = 0; k < N; ++k)
+			(function(k){
+				settings_fields[ g[1] ].push( nameField( grid, s[ g[1] ][k], LABEL_MAX, function(v){
+					var m = settingsModule(); if(m) m.settings[ g[1] ][k] = cleanText( v, LABEL_MAX, g[2] + (k + 1) );
+				} ) );
+			})(k);
+	});
+
+	root.appendChild( el( "div", "sec", "COLOUR" ) );
+	var sw = el( "div", "swatches" );
+	root.appendChild( sw );
+	COLORS.forEach(function(c, k){
+		var b = el( "button", "sw" + (s.color == c ? " on" : "") );
+		b.title = COLOR_NAMES[k];
+		b.style.background = c || "#111";
+		b.addEventListener( "click", function(){
+			var m = settingsModule();
+			if(!m) return;
+			m.settings.color = c;
+			settings_fields.swatches.forEach(function(o, i){ o.classList.toggle( "on", i == k ); });
+		} );
+		settings_fields.swatches.push( b );
+		sw.appendChild( b );
+	});
+
+	root.appendChild( el( "div", "sec", "KNOBS" ) );
+	var sel = settings_fields.skin = el( "select" );
+	WR.KNOB_SKINS.forEach(function(k){
+		var o = el( "option", null, KNOB_SKIN_NAMES[k] + (k ? "" : " (" + KNOB_SKIN_NAMES[ layout == "classic" ? "classic" : "aluminium" ] + ")") );
+		o.value = k;
+		sel.appendChild( o );
+	});
+	sel.value = s.knob_skin || "";
+	sel.addEventListener( "change", function(){ var m = settingsModule(); if(m) m.settings.knob_skin = sel.value; sel.blur(); } );
+	root.appendChild( sel );
+
+	var close = el( "button", "close", "CLOSE" );
+	close.addEventListener( "click", closeSettings );
+	root.appendChild( close );
+	document.body.appendChild( root );
+	var f = focus == "name" ? settings_fields.name : (focus && settings_fields[ focus[0] ] ? settings_fields[ focus[0] ][ focus[1] ] : null);
+	if(f) { f.focus(); if(f.select) f.select(); }
+}
+
+function closeSettings()
+{
+	if(settings_el && settings_el.parentNode)
+		settings_el.parentNode.removeChild( settings_el );
+	settings_el = settings_id = settings_fields = null;
+}
+
+document.addEventListener( "keydown", function(e){ if(e.key == "Escape" && settings_el) closeSettings(); } );
+// the module gone (removed, another patch): its settings close
+setInterval(function(){ if(settings_el && !settingsModule()) closeSettings(); }, 500);
 
 // ---------------------------------------------------------------------------
 // the panel in the rack
@@ -149,22 +247,17 @@ function shade( hex, k )
 	return "rgb(" + c.join( "," ) + ")";
 }
 
-// a name under a control: double click to rename it
-function renamable( text, cx, cy, hid, question, done )
+// a name under a control: double click opens the settings at its field
+function renamable( M, text, cx, cy, field )
 {
 	drawLabel( text, cx, cy, 11 );
 	if(hitRect( cx - 44, cy - 8, 88, 16 ) && !cable_drag && ui.active === null)
 	{
-		ui.hot = id_prefix + hid;
+		ui.hot = id_prefix + field.join( "" );
 		tip( "DOUBLE CLICK: RENAME", cx, cy + 16 );
 		if(ui.dbl && ui.pressed)
-			askText( question, text, done );
+			openSettings( M.id, field );
 	}
-}
-
-function askName( s )
-{
-	askText( "Name of this SUBRACK:", s.name, function(t){ s.name = cleanText( t, NAME_MAX, "SUBRACK" ); } );
 }
 
 // the four toggle buttons: +5 V inside while on. Returns nothing; s.toggles changes
@@ -199,7 +292,7 @@ function drawPanel( M )
 		ui.hot = id_prefix + "name";
 		tip( "DOUBLE CLICK: RENAME", 44 + nw * 0.5, 64 );
 		if(ui.dbl && ui.pressed)
-			askName( s );
+			openSettings( M.id, "name" );
 	}
 	var inner = s.inner.modules;
 	ctx.font = "10px " + FONT;
@@ -259,7 +352,7 @@ function drawPanel( M )
 		s.macros[k] = knob( "macro" + (k + 1), cx, 74, 25, s.macros[k], 0, 1, {
 			def: 0, format: function(v){ return (v * 5).toFixed( 2 ) + " V" }
 		} );
-		(function(k){ renamable( s.labels[k], cx, 118, "label" + k, "Name of macro " + (k + 1) + ":", function(t){ s.labels[k] = cleanText( t, LABEL_MAX, "MACRO " + (k + 1) ); } ); })(k);
+		renamable( M, s.labels[k], cx, 118, ["labels", k] );
 	}
 
 	// buttons: on, +5 V inside; off, 0 V
@@ -267,7 +360,7 @@ function drawPanel( M )
 	drawSection( "BUTTONS", bx, bx + bw, 18 );
 	toggleButtons( s, bx, bstep, 58, 50, 34 );
 	for(var k = 0; k < N; ++k)
-		(function(k){ renamable( s.blabels[k], bx + bstep * (k + 0.5), 118, "blabel" + k, "Name of button " + (k + 1) + ":", function(t){ s.blabels[k] = cleanText( t, LABEL_MAX, "BUTTON " + (k + 1) ); } ); })(k);
+		renamable( M, s.blabels[k], bx + bstep * (k + 0.5), 118, ["blabels", k] );
 
 	// CV in and out, to the jacks of the SUBRACK I/O inside
 	var jx = mx, jw = bx + bw - mx, js = jw / 8;
@@ -279,28 +372,18 @@ function drawPanel( M )
 		drawJack( j[2], jx + js * (c + 0.5), 204, j[0], j[1] );
 	});
 
-	// the panel: name and colour
+	// the panel's settings (name, names, colour, knobs) open on the page
 	var px = bx + bw + 30, pw = w - 46 - px;
-	drawSection( "PANEL", px, px + pw, 18 );
-	if(button( "rename", px, 40, pw, 26, "NAME\u2026" ).clicked)
-		askName( s );
-	drawLabel( "COLOUR: " + COLOR_NAMES[ COLORS.indexOf( s.color ) ], px + pw * 0.5, 84, 10, false, DIM_COLOR );
-	var cols = 6, cs = pw / cols;
-	COLORS.forEach(function(c, k){
-		var cx = px + cs * (k % cols) + cs * 0.5, cy = 108 + Math.floor( k / cols ) * 32, r = 11;
-		var hover = !cable_drag && ui.active === null && hitCircle( cx, cy, r + 2 );
-		ctx.fillStyle = c || "#111";
-		ctx.beginPath(); ctx.arc( cx, cy, r, 0, Math.PI * 2 ); ctx.fill();
-		ctx.strokeStyle = s.color == c ? "#f2eee6" : (hover ? "#9a9a94" : "rgba(255,255,255,0.18)");
-		ctx.lineWidth = s.color == c ? 2.5 : 1.2;
-		ctx.stroke();
-		if(hover)
-		{
-			ui.hot = id_prefix + "color" + k;
-			tip( COLOR_NAMES[k], cx, cy + 22 );
-			if(ui.pressed) { ui.active = id_prefix + "color" + k; s.color = c; }
-		}
-	});
+	var shown_settings = settings_id == M.id;
+	if(button( "settings", px, 40, pw, 34, "SETTINGS\u2026", shown_settings ).clicked)
+	{
+		if(shown_settings) closeSettings();
+		else openSettings( M.id );
+	}
+	ctx.font = "10px " + FONT;
+	ctx.fillStyle = DIM_COLOR;
+	ctx.textAlign = "center"; ctx.textBaseline = "middle";
+	ctx.fillText( "NAMES \u00b7 COLOUR \u00b7 KNOBS", px + pw * 0.5, 88 );
 	ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 22px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
@@ -365,9 +448,11 @@ function drawIO( id, x, y, w, h )
 	{
 		var cx = px + 8 + ks * (k + 0.5);
 		id_prefix = id + ".";
+		knob_skin = s.knob_skin || null;
 		s.macros[k] = knob( "macro" + (k + 1), cx, y + 50, 14, s.macros[k], 0, 1, {
 			def: 0, format: function(v){ return (v * 5).toFixed( 2 ) + " V" }
 		} );
+		knob_skin = null;
 		id_prefix = "";
 		drawJack( "sr_k" + (k + 1), cx, jy, s.labels[k], "out" );
 	}
@@ -542,7 +627,10 @@ window.SUBRACK = {
 	closeAll: closeAll,
 	isOpen: function( id ){ return !!(windows[id] && !windows[id].win.closed); },
 	windows: function(){ return windows; },
-	ids: function(){ return Object.keys( windows ); }
+	ids: function(){ return Object.keys( windows ); },
+	openSettings: openSettings,
+	closeSettings: closeSettings,
+	settingsOpen: function(){ return settings_id; }
 };
 
 WR.registerSynth( "subrack", {
