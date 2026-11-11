@@ -113,7 +113,7 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) opens a panel with every device, grouped into synths, modulation, mixing and effects. Each card shows the device's picture, what it is, and whether it is full or half width, takes MIDI, is an insert effect, or is already in the rack.
+- **Add device** (toolbar) (or the *Add Device* button at the end of the rack) opens a panel with every device, grouped into synths, modulation, mixing and effects. Each card shows the device's picture, what it is, and whether it is full or half width, takes MIDI, is an insert effect, or is already in the rack.
   - Type in the search box to filter (Enter adds the first match); click a card to add that device at the bottom of the rack, which scrolls to it. `index.html#add` opens the panel.
   - The pictures are in `app/previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `app/index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
