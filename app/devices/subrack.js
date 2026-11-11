@@ -272,6 +272,56 @@ function toggleButtons( s, x0, step, y, bw, bh )
 	}
 }
 
+// a screen with the output's frequency bands (40 Hz to 16 kHz, -60 to 0 dB), a peak mark on each and
+// the level, to see that the rack inside is making sound
+var peaks = {}; // module id -> peak marks, falling
+function drawSpectrum( M, x, y, w, h )
+{
+	var st = M.state || {}, bands = st.bands || [], n = bands.length || 24;
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill();
+	ctx.fillStyle = "#0d1a09";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	var gx = x + 8, gw = w - 16, gy = y + 22, gh = h - 40;
+	// grid: -48 / -24 / 0 dB lines and the frequencies
+	ctx.strokeStyle = "rgba(182,240,106,0.12)"; ctx.lineWidth = 1;
+	[0, 0.2, 0.6, 1].forEach(function(t){ ctx.beginPath(); ctx.moveTo( gx, gy + gh * t + 0.5 ); ctx.lineTo( gx + gw, gy + gh * t + 0.5 ); ctx.stroke(); });
+	ctx.font = "bold 9px 'Courier New', monospace";
+	ctx.fillStyle = "#6f9a3f"; ctx.textBaseline = "middle";
+	ctx.textAlign = "left"; ctx.fillText( "OUTPUT SPECTRUM", gx, y + 11 );
+	var lv = st.level || 0, db = lv > 0 ? 20 * Math.log10( lv ) : -90;
+	ctx.textAlign = "right"; ctx.fillText( (db < -80 ? "-INF" : db.toFixed( 1 )) + " DB", gx + gw, y + 11 );
+	ctx.textAlign = "center";
+	[[40, "40"], [100, "100"], [1000, "1K"], [10000, "10K"]].forEach(function(f){
+		var bx = gx + gw * (Math.log( f[0] / 40 ) / Math.log( 16000 / 40 )) ;
+		ctx.fillText( f[1], bx, y + h - 8 );
+	});
+	var pk = peaks[ M.id ] = peaks[ M.id ] || [];
+	var bw = gw / n, segs = 18, sh = gh / segs;
+	for(var i = 0; i < n; ++i)
+	{
+		var v = clamp( ((bands[i] === undefined ? -90 : bands[i]) + 60) / 60, 0, 1 );
+		pk[i] = Math.max( v, (pk[i] || 0) - 0.006 );
+		var lit = Math.round( v * segs );
+		for(var s2 = 0; s2 < segs; ++s2)
+		{
+			var on = s2 < lit, t = (s2 + 0.5) / segs;
+			ctx.fillStyle = t > 0.9 ? (on ? "#ff3b2f" : "#2b1210") : (t > 0.7 ? (on ? "#ffb02f" : "#2b2210") : (on ? "#8be04a" : "#14240d"));
+			ctx.fillRect( gx + i * bw + 1, gy + gh - (s2 + 1) * sh + 1, bw - 2, sh - 1.5 );
+		}
+		if(pk[i] > 0.02)
+		{
+			ctx.fillStyle = "#e8f6c8";
+			ctx.fillRect( gx + i * bw + 1, gy + gh - Math.min( segs - 1, Math.floor( pk[i] * segs ) ) * sh - sh + 1, bw - 2, 1.5 );
+		}
+	}
+	if(!bands.length)
+	{
+		ctx.fillStyle = "#6f9a3f"; ctx.textAlign = "center";
+		ctx.fillText( "AUDIO OFF", x + w * 0.5, gy + gh * 0.5 );
+	}
+}
+
 function drawPanel( M )
 {
 	var s = M.settings, st = M.state || {};
@@ -375,15 +425,12 @@ function drawPanel( M )
 	// the panel's settings (name, names, colour, knobs) open on the page
 	var px = bx + bw + 30, pw = w - 46 - px;
 	var shown_settings = settings_id == M.id;
-	if(button( "settings", px, 40, pw, 34, "SETTINGS\u2026", shown_settings ).clicked)
+	if(button( "settings", px + pw - 74, 12, 74, 20, "SETTINGS\u2026", shown_settings ).clicked)
 	{
 		if(shown_settings) closeSettings();
 		else openSettings( M.id );
 	}
-	ctx.font = "10px " + FONT;
-	ctx.fillStyle = DIM_COLOR;
-	ctx.textAlign = "center"; ctx.textBaseline = "middle";
-	ctx.fillText( "NAMES \u00b7 COLOUR \u00b7 KNOBS", px + pw * 0.5, 88 );
+	drawSpectrum( M, px, 40, pw, 138 );
 	ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 22px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;

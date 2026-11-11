@@ -6,11 +6,14 @@
 //   rear IN L / R -> inside IN L / R (src_l / src_r)    inside OUT L / R (ret_l / ret_r) -> rear OUT L / R
 //   the 4 MACRO knobs -> inside MACRO 1-4 (k1..k4), 0..+5 V, smoothed
 //   the 4 toggle BUTTONS -> inside BUTTON 1-4 (b1..b4), +5 V while on, 0 V off
+//   the output's spectrum: BANDS band pass filters (40 Hz to 16 kHz, third octave steps) on L + R, their
+//   levels in state().bands (dB, -90..0), for the panel's screen
 //   MIDI IN -> inside MIDI IN (midi_thru, to the devices cabled from it or with MASTER MIDI on)
 // An unpatched R takes its L, on both sides.
 (function(){
 
 const N = 4;
+const BANDS = 24, F_LO = 40, F_HI = 16000;
 const IN_IDS = ["cv1", "cv2", "cv3", "cv4", "o1", "o2", "o3", "o4", "in_l", "in_r", "ret_l", "ret_r"];
 const OUT_IDS = ["out1", "out2", "out3", "out4", "i1", "i2", "i3", "i4", "k1", "k2", "k3", "k4", "out_l", "out_r", "src_l", "src_r", "b1", "b2", "b3", "b4"];
 const I_CV = 0, I_O = 4, I_IN_L = 8, I_IN_R = 9, I_RET_L = 10, I_RET_R = 11;
@@ -29,6 +32,20 @@ class SubrackDSP {
 		this.smooth = 1 - Math.exp(-1 / (0.01 * sampleRate));
 		this.peak = 0;
 		this.activity = 0;
+		// the analyser: biquad band passes (RBJ, constant 0 dB peak) and a power follower for each
+		const ratio = Math.pow(F_HI / F_LO, 1 / (BANDS - 1)), bw = Math.log2(ratio) * 1.15;
+		this.bq = new Float64Array(BANDS * 5);   // b0, a1, a2 (b1 = 0, b2 = -b0), then x1 / x2 are in z
+		this.z = new Float64Array(BANDS * 4);    // x1, x2, y1, y2
+		this.pow = new Float64Array(BANDS);
+		this.pk = 0;
+		this.follow = 1 - Math.exp(-1 / (0.05 * sampleRate));
+		for (let i = 0; i < BANDS; i++) {
+			const f = Math.min(F_LO * Math.pow(ratio, i), sampleRate * 0.45), w0 = 2 * Math.PI * f / sampleRate;
+			const alpha = Math.sin(w0) * Math.sinh(Math.log(2) / 2 * bw * w0 / Math.sin(w0)), a0 = 1 + alpha;
+			this.bq[i * 5] = alpha / a0;
+			this.bq[i * 5 + 1] = -2 * Math.cos(w0) / a0;
+			this.bq[i * 5 + 2] = (1 - alpha) / a0;
+		}
 	}
 	setSettings(s) {
 		this.s = s;
@@ -71,11 +88,26 @@ class SubrackDSP {
 		outs[O_SRC_R] = p[I_IN_R] ? ins[I_IN_R] : ins[I_IN_L];
 		const a = Math.max(l < 0 ? -l : l, r < 0 ? -r : r);
 		if (a > this.peak) this.peak = a;
+		// the spectrum, only while something comes out (a silent output decays by itself)
+		const x = (l + r) * 0.5, bq = this.bq, z = this.z, pw = this.pow, fl = this.follow;
+		if (a > 1e-6 || this.pk > 1e-12) {
+			let hot = 0;
+			for (let i = 0; i < BANDS; i++) {
+				const b0 = bq[i * 5], a1 = bq[i * 5 + 1], a2 = bq[i * 5 + 2], o = i * 4;
+				const y = b0 * x - b0 * z[o + 1] - a1 * z[o + 2] - a2 * z[o + 3];
+				z[o + 1] = z[o]; z[o] = x; z[o + 3] = z[o + 2]; z[o + 2] = y;
+				pw[i] += (y * y - pw[i]) * fl;
+				if (pw[i] > hot) hot = pw[i];
+			}
+			this.pk = hot;
+		}
 		return 0;
 	}
 	endBlock() {}
 	state() {
-		const st = { level: this.peak, midi: this.activity > 0 };
+		const bands = new Array(BANDS);
+		for (let i = 0; i < BANDS; i++) bands[i] = Math.max(-90, Math.min(0, 10 * Math.log10(this.pow[i] * 2 + 1e-9)));
+		const st = { level: this.peak, midi: this.activity > 0, bands: bands };
 		this.peak *= 0.5;
 		if (this.activity > 0) this.activity--;
 		return st;
