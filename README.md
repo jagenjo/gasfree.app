@@ -747,7 +747,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 67 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, CSS 90, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth), SUBRACK and RACK (several devices together), plus your own.
+  - The toolbar menu has 68 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, CSS 90, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth), SUBRACK and RACK (several devices together, and Clear, an empty rack), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
