@@ -425,12 +425,12 @@ function drawPanel( M )
 	// the panel's settings (name, names, colour, knobs) open on the page
 	var px = bx + bw + 30, pw = w - 46 - px;
 	var shown_settings = settings_id == M.id;
-	if(button( "settings", px + pw - 74, 12, 74, 20, "SETTINGS\u2026", shown_settings ).clicked)
+	drawSpectrum( M, px, 16, pw, 150 );
+	if(button( "settings", px, 176, 74, 20, "SETTINGS\u2026", shown_settings ).clicked)
 	{
 		if(shown_settings) closeSettings();
 		else openSettings( M.id );
 	}
-	drawSpectrum( M, px, 40, pw, 138 );
 	ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 22px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
