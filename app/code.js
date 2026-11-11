@@ -1936,6 +1936,41 @@ function drawEmptyRack( w )
 	drawLabel( "THE RACK IS EMPTY: INSERT DEVICES WITH \u201cADD DEVICE\u201d IN THE TOOLBAR", w * 0.5, EMPTY_RACK_H * 0.5, 14, false, DIM_COLOR );
 }
 
+// at the end of the rack: a rounded outline button with a plus that opens the ADD DEVICE panel
+var ADD_BTN_H = 70, ADD_BTN_BH = 38;
+function drawAddDeviceButton( y0 )
+{
+	var w = PANEL_W - 2 * 30, h = ADD_BTN_BH, x = 30, y = y0 + (ADD_BTN_H - h) * 0.5 - KB_GAP * 0.5;
+	var id = "add_device_button";
+	var hover = !cable_drag && ui.active === null && hitRect( x, y, w, h );
+	if(hover)
+		ui.hot = id;
+	if(hover && ui.pressed)
+	{
+		ui.active = id;
+		openAddPanel();
+	}
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 6 );
+	if(hover)
+	{
+		ctx.fillStyle = "#121212";
+		ctx.fill();
+	}
+	ctx.strokeStyle = hover ? "#4e4e4b" : "#3a3a38";
+	ctx.lineWidth = 2;
+	ctx.stroke();
+	var cx = PANEL_W * 0.5 - 52, cy = y + h * 0.5;
+	ctx.beginPath();
+	ctx.moveTo( cx - 8, cy ); ctx.lineTo( cx + 8, cy );
+	ctx.moveTo( cx, cy - 8 ); ctx.lineTo( cx, cy + 8 );
+	ctx.stroke();
+	ctx.font = "bold 15px " + FONT;
+	ctx.textAlign = "left";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = hover ? "#6a6a66" : "#575754";
+	ctx.fillText( "Add Device", cx + 24, cy + 1 );
+}
+
 // draws the modules from y down; returns the height used
 function drawModules( y0 )
 {
@@ -2803,6 +2838,8 @@ function draw()
 		y += deviceH( "keys", KB_H ) + KB_GAP;
 	}
 	y += drawModules( y );
+	if(!SCOPE)
+		drawAddDeviceButton( y );
 	updateCables(); // front or rear: only the jacks of the side shown are registered
 	drawCables();
 	drawControlJacks();
@@ -3150,6 +3187,8 @@ $("power").addEventListener("click", function(){
 function updatePanelHeight()
 {
 	PANEL_H = (SCOPE ? deviceH( SCOPE.io.id, SCOPE.io.h ) + KB_GAP : deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP) + modulesH() - KB_GAP;
+	if(!SCOPE)
+		PANEL_H += ADD_BTN_H;
 	if(show_rear)
 		PANEL_H += 50; // room for the rear cables hanging below the bottom row
 	if(!PREVIEW_TYPE && canvas.clientHeight) // half a screen of empty rack after the last device
