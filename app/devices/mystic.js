@@ -242,6 +242,7 @@ var FONT5 = {
 // text in dots of size d (device px) from x, y (device px, top left); returns the width
 function oledText( text, x, y, d, color, align )
 {
+	if(DEV_OFF) return;
 	text = String( text ).toUpperCase();
 	var w = text.length * 6 * d - d;
 	if(align == "center") x -= w / 2; else if(align == "right") x -= w;

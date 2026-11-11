@@ -277,6 +277,7 @@ function mj( id, cx, cy, type, label )
 
 function drawOled( x, y, w, h )
 {
+	if(DEV_OFF) { blankScreen( x, y, w, h, 0 ); return; }
 	var u = uiOf(), e = T.ENGINES[ S.type ], C = "#e9f6ff";
 	ctx.fillStyle = "#020304"; ctx.fillRect( x, y, w, h );
 	ctx.save(); ctx.beginPath(); ctx.rect( x, y, w, h ); ctx.clip();

@@ -1817,6 +1817,87 @@ function powerButton( id, off, cx, cy )
 	ctx.strokeStyle = off ? "#fff2ee" : "#7a2a20"; // the O: bright when off, dim when on
 	ctx.beginPath(); ctx.arc( cx, oy, off ? 6.5 : 3.2, 0, Math.PI * 2 ); ctx.stroke();
 }
+// A device that is off: its LEDs go black. While it draws, the small fills in a bright, saturated colour
+// (the LEDs and their glows) are drawn in black instead. Screens do it themselves (DEV_OFF)
+var DEV_OFF = false;
+var LED_SIZE = 34; // the biggest fill taken for an LED (or a lit button)
+var emissive_cache = {};
+function isEmissive( col )
+{
+	if(typeof col != "string")
+		return false;
+	var e = emissive_cache[ col ];
+	if(e !== undefined)
+		return e;
+	var r = -1, g = 0, b = 0, m;
+	if((m = /^#([0-9a-f]{3})$/i.exec( col )))
+	{ r = parseInt( m[1][0] + m[1][0], 16 ); g = parseInt( m[1][1] + m[1][1], 16 ); b = parseInt( m[1][2] + m[1][2], 16 ); }
+	else if((m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec( col )))
+	{ r = parseInt( m[1], 16 ); g = parseInt( m[2], 16 ); b = parseInt( m[3], 16 ); }
+	else if((m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec( col )))
+	{ r = +m[1]; g = +m[2]; b = +m[3]; }
+	var hi = Math.max( r, g, b ), lo = Math.min( r, g, b );
+	e = r >= 0 && hi >= 140 && (hi - lo) / hi >= 0.5;
+	return emissive_cache[ col ] = e;
+}
+function setDeviceOff( off )
+{
+	DEV_OFF = off;
+	var c = ctx, keys = ["beginPath", "arc", "roundRect", "rect", "fill", "fillRect", "fillText"];
+	if(!off)
+	{
+		var saved = c._off_saved;
+		if(saved)
+			keys.forEach(function(k){ if(saved[k].own) c[k] = saved[k].fn; else delete c[k]; });
+		c._off_saved = null;
+		return;
+	}
+	var size = 0, o = {};
+	c._off_saved = {};
+	keys.forEach(function(k){
+		o[k] = c[k];
+		c._off_saved[k] = { own: Object.prototype.hasOwnProperty.call( c, k ), fn: c[k] };
+	});
+	c.beginPath = function(){ size = 0; return o.beginPath.apply( c, arguments ); };
+	c.arc = function(x, y, r){ size = Math.max( size, r * 2 ); return o.arc.apply( c, arguments ); };
+	c.roundRect = function(x, y, w, h){ size = Math.max( size, Math.abs( w ), Math.abs( h ) ); return o.roundRect.apply( c, arguments ); };
+	c.rect = function(x, y, w, h){ size = Math.max( size, Math.abs( w ), Math.abs( h ) ); return o.rect.apply( c, arguments ); };
+	c.fill = function(){
+		if(size <= LED_SIZE && isEmissive( c.fillStyle ))
+		{
+			if(/^rgba/i.test( c.fillStyle )) return; // a glow
+			var keep = c.fillStyle;
+			c.fillStyle = "#050505";
+			o.fill.apply( c, arguments );
+			c.fillStyle = keep;
+			return;
+		}
+		return o.fill.apply( c, arguments );
+	};
+	c.fillText = function(){ // the text of a screen (a monospace font) is not drawn
+		if(/monospace|courier/i.test( c.font )) return;
+		return o.fillText.apply( c, arguments );
+	};
+	c.fillRect = function(x, y, w, h){
+		if(Math.max( Math.abs( w ), Math.abs( h ) ) <= LED_SIZE && isEmissive( c.fillStyle ))
+		{
+			if(/^rgba/i.test( c.fillStyle )) return;
+			var keep = c.fillStyle;
+			c.fillStyle = "#050505";
+			o.fillRect.apply( c, arguments );
+			c.fillStyle = keep;
+			return;
+		}
+		return o.fillRect.apply( c, arguments );
+	};
+}
+// a screen of a device that is off: black (x, y, w, h in the device's units)
+function blankScreen( x, y, w, h, r )
+{
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, r || 3 ); ctx.fill();
+}
+
 function dimOff( m, w, h )
 {
 	if(!m.off)
@@ -2061,7 +2142,7 @@ function drawModules( y0 )
 					drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
 				dimOff( m, collapsed[ m.id ] ? w : fit.w, collapsed[ m.id ] ? DEVICE_COLLAPSED_H : fit.h );
 				if(!collapsed[ m.id ])
-					powerButton( m.id, m.off, 40, 44 );
+					powerButton( m.id, m.off, 50, 54 );
 				endFrame();
 			}
 			else if(collapsed[ m.id ])
@@ -2081,7 +2162,8 @@ function drawModules( y0 )
 				knob_skin = m.settings.knob_skin || m.def.knob_skin || null;
 				keyDeviceBegin( m.id, x, y, fit.w * fit.k, fit.h * fit.k );
 				casing_wood = !!m.def.wood;
-				m.def.draw( m );
+				if(m.off) setDeviceOff( true );
+				try { m.def.draw( m ); } finally { if(m.off) setDeviceOff( false ); }
 				casing_wood = false;
 				keyDeviceEnd();
 				knob_skin = null;
@@ -2111,6 +2193,7 @@ var IO_H = 70;
 // one line green LCD
 function drawLcd( x, y, w, h, text, align )
 {
+	if(DEV_OFF) { blankScreen( x - 3, y - 3, w + 6, h + 6, 5 ); return; }
 	ctx.fillStyle = "#050505";
 	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill();
 	ctx.fillStyle = "#16240f";

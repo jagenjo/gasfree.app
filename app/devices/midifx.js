@@ -68,6 +68,7 @@ function section( x, y, w, h, title, onKey, s, tooltip )
 // the screen: the notes in, the notes out, what is on
 function drawScreen( x, y, w, h, s, st )
 {
+	if(DEV_OFF) { blankScreen( x, y, w, h, 4 ); return; }
 	ctx.fillStyle = "#070a07"; ctx.beginPath(); ctx.roundRect( x, y, w, h, 4 ); ctx.fill();
 	ctx.strokeStyle = "#2b2e2a"; ctx.lineWidth = 1; ctx.stroke();
 	var green = "#8cf06a", dim = "#2f5a26";

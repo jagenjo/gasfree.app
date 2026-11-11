@@ -102,6 +102,7 @@ var fmtDb = function(v){ return (v > 0 ? "+" : "") + v.toFixed( 1 ) + " dB"; };
 // the display: grid, spectrum bars, the EQ curve, the band points (drag them)
 function drawDisplay( M, x, y, w, h )
 {
+	if(DEV_OFF) { blankScreen( x - 6, y - 6, w + 12, h + 12, 6 ); return; }
 	var s = M.settings, st = M.state || {};
 	var fx = function(f){ return x + Math.log( f / FMIN ) / Math.log( FMAX / FMIN ) * w; };
 	var xf = function(px){ return FMIN * Math.pow( FMAX / FMIN, (px - x) / w ); };

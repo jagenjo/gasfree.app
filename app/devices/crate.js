@@ -538,6 +538,7 @@ function nudge( u, d )
 
 function drawLcd()
 {
+	if(DEV_OFF) { blankScreen( LX - 10, LY - 8, LW + 20, LH + 16, 6 ); return; }
 	var u = uiOf();
 	ctx.fillStyle = "#000"; ctx.beginPath(); ctx.roundRect( LX - 10, LY - 8, LW + 20, LH + 16, 6 ); ctx.fill();
 	ctx.fillStyle = LCD_BG; ctx.fillRect( LX, LY, LW, LH );
@@ -597,7 +598,7 @@ function drawTimeline( st )
 // SAMPLE: the input level, and the recording
 function drawMeters( st )
 {
-	var pk = st.peak || [0, 0];
+	var pk = DEV_OFF ? [0, 0] : (st.peak || [0, 0]);
 	["L", "R"].forEach(function(c, i){
 		var y = LY + 92 + i * 18, x0 = LX + 30, w = LW - 60;
 		lcdText( c, 10, 92 + i * 18, false );

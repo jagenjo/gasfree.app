@@ -111,6 +111,7 @@ function txt( t, x, y, size, color, align, bold )
 
 function drawScreen()
 {
+	if(DEV_OFF) { blankScreen( SX - 26, SY - 10, N * CELL + 36, N * CELL + 20, 6 ); return; }
 	var pat = S.patterns[ S.pat ], w = N * CELL, sc = SCALES[ S.scale ];
 	// bezel and glass
 	ctx.fillStyle = "#050505";

@@ -308,6 +308,7 @@ function edit( d ) { var p = params()[ S.cursor ]; p[3]( S.ch[ SLOT_CH[ S.sel ] 
 function drawDisplay()
 {
 	var x = X(358), y = Y(343), w = 210, h = 107;
+	if(DEV_OFF) { blankScreen( x - 3, y - 3, w + 6, h + 6, 3 ); return; }
 	ctx.fillStyle = "#050505";
 	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 3 ); ctx.fill();
 	ctx.fillStyle = "#0c0c0c";

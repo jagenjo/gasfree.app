@@ -72,6 +72,7 @@ function meterLevels( st )
 // vertical LED meter, -48..+6 dB
 function drawMeter( x, y, h, level )
 {
+	if(DEV_OFF) level = 0;
 	var db = level > 0 ? 20 * Math.log10( level ) : -100;
 	var n = clamp( (db + 48) / 54, 0, 1 );
 	var segs = 18, sh = h / segs;

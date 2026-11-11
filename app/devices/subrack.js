@@ -277,6 +277,7 @@ function toggleButtons( s, x0, step, y, bw, bh )
 var peaks = {}; // module id -> peak marks, falling
 function drawSpectrum( M, x, y, w, h )
 {
+	if(DEV_OFF) { blankScreen( x - 3, y - 3, w + 6, h + 6, 5 ); return; }
 	var st = M.state || {}, bands = st.bands || [], n = bands.length || 24;
 	ctx.fillStyle = "#050505";
 	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill();

@@ -32,6 +32,7 @@ function fmtScopeTime( t ) { return t >= 1 ? t + " s" : Math.round( t * 1000 ) +
 
 function drawScope( x, y, w, h, data )
 {
+	if(DEV_OFF) { blankScreen( x, y, w, h, 3 ); return; }
 	var s = M.settings;
 	var id = id_prefix + "scope_screen";
 	var hover = !cable_drag && (ui.active === null || ui.active === id) && hitRect( x, y, w, h );

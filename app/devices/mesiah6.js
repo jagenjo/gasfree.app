@@ -263,6 +263,7 @@ function segDigit( ch, x, y, w, h, dot )
 }
 function display( text, x, y )
 {
+	if(DEV_OFF) { blankScreen( x, y, 104, 54, 4 ); return; }
 	ctx.fillStyle = "#050404"; ctx.beginPath(); ctx.roundRect( x, y, 104, 54, 4 ); ctx.fill();
 	ctx.fillStyle = "#1a0605"; ctx.fillRect( x + 6, y + 6, 92, 42 );
 	var t = String( text ); while(t.length < 3) t = " " + t;

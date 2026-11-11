@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261111o"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261111q"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
