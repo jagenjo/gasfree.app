@@ -1772,49 +1772,50 @@ function setModuleOff( id, off )
 }
 function powerButton( id, off, cx, cy )
 {
-	var w = 22, h = 26, x = cx - w / 2, y = cy - h / 2;
+	var w = 32, h = 42, x = cx - w / 2, y = cy - h / 2;
 	var hover = !cable_drag && ui.active === null && hitRect( x - 2, y - 2, w + 4, h + 4 );
 	if(hover)
 	{
 		ui.hot = "power_" + id;
-		tip( off ? "POWER ON" : "POWER OFF: no sound, no routing, no CPU", cx + 30, cy + 2 );
+		tip( off ? "POWER ON" : "POWER OFF: no sound, no routing, no CPU", cx + 34, cy + 2 );
 	}
 	if(hover && ui.pressed)
 	{
 		ui.active = "power_" + id;
 		setModuleOff( id, !off );
 	}
-	// a rocker switch: black bezel, red rocker with the I and O marks, lit while on. The pressed
-	// half (I on top when on, O at the bottom when off) is darker, the other half catches the light
-	ctx.fillStyle = "#0c0c0c";
-	ctx.beginPath(); ctx.roundRect( x, y, w, h, 2.5 ); ctx.fill();
-	ctx.fillStyle = "#1c1c1c";
-	ctx.fillRect( x + 1, y + 1, w - 2, 1 );
-	var rx = x + 2.5, ry = y + 2.5, rw = w - 5, rh = h - 5;
-	if(!off) // the lit rocker glows
+	// a rocker switch seen from the front: black bezel, red rocker with the I (top) and O (bottom)
+	// marks. It tilts: the half that faces you is bigger and brighter. On, the I faces you (and
+	// glows); off, the O does
+	if(!off)
 	{
 		ctx.fillStyle = "#3a1410";
 		ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 6 ); ctx.fill();
-		ctx.fillStyle = "#0c0c0c";
-		ctx.beginPath(); ctx.roundRect( x, y, w, h, 2.5 ); ctx.fill();
 	}
-	// the half pressed in (I on top when on, O at the bottom when off) is darker than the raised half
-	var lit = off ? ["#5a1612", "#7a1d17"] : ["#d83a24", "#ff6a4a"];
-	ctx.fillStyle = lit[ off ? 1 : 0 ];
-	ctx.beginPath(); ctx.roundRect( rx, ry, rw, rh, 2 ); ctx.fill();
-	ctx.fillStyle = lit[ off ? 0 : 1 ];
-	ctx.beginPath(); ctx.roundRect( rx, off ? ry + rh * 0.5 : ry, rw, rh * 0.5, 2 ); ctx.fill();
+	ctx.fillStyle = "#0c0c0c";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	var rx = x + 3, ry = y + 3, rw = w - 6, rh = h - 6;
+	var big = rh * 0.62, small = rh - big;
+	var topH = off ? small : big, botH = off ? big : small;
+	ctx.fillStyle = off ? "#4a100d" : "#ff6a4a"; // the I half
+	ctx.beginPath(); ctx.roundRect( rx, ry, rw, topH, 2 ); ctx.fill();
+	ctx.fillStyle = off ? "#9a2a20" : "#a82414"; // the O half
+	ctx.beginPath(); ctx.roundRect( rx, ry + topH, rw, botH, 2 ); ctx.fill();
+	ctx.fillStyle = "#0c0c0c";
+	ctx.fillRect( rx, ry + topH - 0.5, rw, 1 );
 	if(hover)
 	{
 		ctx.strokeStyle = "#8a8a84";
 		ctx.lineWidth = 1;
-		ctx.beginPath(); ctx.roundRect( x - 1.5, y - 1.5, w + 3, h + 3, 3.5 ); ctx.stroke();
+		ctx.beginPath(); ctx.roundRect( x - 1.5, y - 1.5, w + 3, h + 3, 4.5 ); ctx.stroke();
 	}
-	ctx.strokeStyle = off ? "#e6b2a8" : "#fff2ee";
-	ctx.fillStyle = ctx.strokeStyle;
-	ctx.lineWidth = 1.6;
-	ctx.beginPath(); ctx.moveTo( cx, cy - 8 ); ctx.lineTo( cx, cy - 3.5 ); ctx.stroke(); // I
-	ctx.beginPath(); ctx.arc( cx, cy + 5.2, 2.7, 0, Math.PI * 2 ); ctx.stroke();        // O
+	ctx.lineWidth = 2;
+	var iy = ry + topH * 0.5, oy = ry + topH + botH * 0.5;
+	ctx.strokeStyle = off ? "#7a3a34" : "#fff2ee"; // the I: bright when on, dim when off
+	var ih = off ? 3 : 7;
+	ctx.beginPath(); ctx.moveTo( cx, iy - ih ); ctx.lineTo( cx, iy + ih ); ctx.stroke();
+	ctx.strokeStyle = off ? "#fff2ee" : "#7a2a20"; // the O: bright when off, dim when on
+	ctx.beginPath(); ctx.arc( cx, oy, off ? 6.5 : 3.2, 0, Math.PI * 2 ); ctx.stroke();
 }
 function dimOff( m, w, h )
 {
@@ -2060,7 +2061,7 @@ function drawModules( y0 )
 					drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
 				dimOff( m, collapsed[ m.id ] ? w : fit.w, collapsed[ m.id ] ? DEVICE_COLLAPSED_H : fit.h );
 				if(!collapsed[ m.id ])
-					powerButton( m.id, m.off, 36, 38 );
+					powerButton( m.id, m.off, 40, 44 );
 				endFrame();
 			}
 			else if(collapsed[ m.id ])
