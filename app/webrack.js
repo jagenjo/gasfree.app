@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261024e"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261111d"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -242,7 +242,12 @@ WRContext.routeAudio = function( s, m )
 	{
 		var outs = { io_main_l: "out_l", io_main_r: "out_r" }, ins = { io_main_l: "in_l", io_main_r: "in_r" };
 		var last = s.patches.filter(function(p){ return outs[ p[1] ]; });
-		last.forEach(function(p){ s.patches.push([ WR.jackId( m.id, outs[ p[1] ] ), p[1], p[2] ]); p[1] = WR.jackId( m.id, ins[ p[1] ] ); });
+		last.forEach(function(p){
+			var src = WR.jackId( m.id, outs[ p[1] ] );
+			if(!s.patches.some(function(q){ return q[0] == src && q[1] == p[1]; })) // two synths there: one cable out of it, not two
+				s.patches.push([ src, p[1], p[2] ]);
+			p[1] = WR.jackId( m.id, ins[ p[1] ] );
+		});
 		return;
 	}
 	if(!def.audio_out)
@@ -343,7 +348,7 @@ WRContext.prototype.sync = function()
 	if(json === this._sent)
 		return;
 	this._sent = json;
-	this.post({ type: "settings", settings: this.settings, tempo: this.tempo() });
+	this.post({ type: "settings", settings: WR.flatten( this.settings ), tempo: this.tempo() });
 	this.updateNative();
 }
 
@@ -352,7 +357,7 @@ WRContext.prototype.sync = function()
 WRContext.prototype.onState = function( states )
 {
 	this.module_state = states;
-	this.settings.modules.forEach(function(m){
+	this.flatModules().forEach(function(m){
 		var def = WR.types[ m.type ];
 		if(def && def.onState && states[ m.id ])
 			def.onState( m, states[ m.id ] );
@@ -364,14 +369,122 @@ WRContext.prototype.onState = function( states )
 // what a panel needs to draw a module: its settings, the state its DSP reports, and a way to message it
 WRContext.prototype.modules = function()
 {
+	return this.settings.modules.map( this.panelModule, this );
+}
+
+WRContext.prototype.panelModule = function( m )
+{
 	var that = this;
-	return this.settings.modules.map(function(m){
-		return {
-			id: m.id, type: m.type, def: WR.types[ m.type ], settings: m.settings,
-			state: that.module_state[ m.id ] || null,
-			post: function(msg){ that.postModule( m.id, msg ); }
-		};
+	return {
+		id: m.id, type: m.type, def: WR.types[ m.type ], settings: m.settings,
+		state: that.module_state[ m.id ] || null,
+		post: function(msg){ that.postModule( m.id, msg ); }
+	};
+}
+
+// ---- racks inside a device (SUBRACK) ----
+// A device with def.inner keeps a rack of its own in settings.inner = { modules, patches }. Its
+// modules' ids start with the device's id and "~" (unique in the whole rack: their states, messages,
+// MIDI learn and collapsed rows need nothing else); the cables to its top row use the rack's own jack
+// names (io_main_l, kb_midi...), which def.inner.map turns into the device's own jacks. The audio
+// thread gets one flat rack: the device, then its modules, its MIDI OUT standing in for MASTER MIDI
+
+// every module, the ones inside included, in the audio thread's order
+WRContext.prototype.flatModules = function()
+{
+	var list = [];
+	this.settings.modules.forEach(function(m){
+		list.push( m );
+		if(WR.types[ m.type ].inner && m.settings.inner)
+			list = list.concat( m.settings.inner.modules );
 	});
+	return list;
+}
+
+WR.flatten = function( s )
+{
+	var mods = [], patches = s.patches.slice();
+	s.modules.forEach(function(m){
+		mods.push( m );
+		var def = WR.types[ m.type ], inner = m.settings.inner;
+		if(!def.inner || !inner)
+			return;
+		var J = function(id){
+			if(id.indexOf( "." ) > 0) return id;
+			var k = def.inner.map[ id ];
+			return k ? WR.jackId( m.id, k ) : null;
+		};
+		inner.modules.forEach(function(o){
+			var d = WR.types[ o.type ];
+			if(d.midi_in && o.settings.midi_master)
+			{
+				patches.push([ J( "kb_midi" ), WR.jackId( o.id, d.midi_in ), 0 ]);
+				o = { id: o.id, type: o.type, settings: Object.assign( {}, o.settings, { midi_master: false } ) };
+			}
+			mods.push( o );
+		});
+		inner.patches.forEach(function(p){
+			var a = J( p[0] ), b = J( p[1] );
+			if(a && b) patches.push([ a, b, p[2] ]);
+		});
+	});
+	var r = {};
+	for(var k in s) r[k] = s[k];
+	r.modules = mods;
+	r.patches = patches;
+	return r;
+}
+
+// the rack inside device `id` as a WRContext of its own for the panels: its settings are the inner
+// modules and cables (the rest is the rack's), the methods that change modules and cables work on
+// them, everything else (audio, MIDI, states, messages) is the rack's
+WRContext.SCOPED = ["connect", "setMidiMaster", "disconnect", "removeModule", "moveModule", "modules", "panelModule", "randomize"];
+WRContext.prototype.scope = function( id )
+{
+	var main = this, proxy;
+	var inner = function(){
+		var m = main.settings.modules.find(function(o){ return o.id == id; });
+		return m && m.settings.inner;
+	};
+	var settings = new Proxy( {}, {
+		get: function(t, k){ if(k == "modules" || k == "patches") { var i = inner(); return i ? i[k] : []; } return main.settings[k]; },
+		set: function(t, k, v){ if(k == "modules" || k == "patches") { var i = inner(); if(i) i[k] = v; } else main.settings[k] = v; return true; },
+		has: function(t, k){ return k == "modules" || k == "patches" || k in main.settings; }
+	} );
+	var own = {
+		settings: settings,
+		scope_id: id,
+		exists: function(){ return !!inner(); },
+		// a new module inside: an id after the device's, its audio cabled as in the rack
+		addModule: function( type ){
+			var def = WR.types[ type ], s = settings;
+			var host = main.settings.modules.find(function(o){ return o.id == id; });
+			var allowed = host && WR.types[ host.type ].inner.allowed;
+			if(!def || (allowed && !allowed( type )) || (def.max && s.modules.filter(function(m){ return m.type == type; }).length >= def.max))
+				return null;
+			var base = id + "~" + type, mid = base, n = 1;
+			var taken = function(x){ return main.flatModules().some(function(o){ return o.id == x; }); };
+			while(taken( mid ))
+				mid = base + (++n);
+			var m = { id: mid, type: type, settings: def.defaults() };
+			s.modules.push( m );
+			if(def.midi_in)
+				m.settings.midi_master = true;
+			WRContext.routeAudio( s, m );
+			main.module_state[ mid ] = null;
+			return m;
+		}
+	};
+	proxy = new Proxy( main, {
+		get: function(t, k){
+			if(k in own) return own[k];
+			if(WRContext.SCOPED.indexOf( k ) >= 0) return function(){ return WRContext.prototype[k].apply( proxy, arguments ); };
+			var v = main[k];
+			return typeof v == "function" ? v.bind( main ) : v;
+		},
+		set: function(t, k, v){ main[k] = v; return true; }
+	} );
+	return proxy;
 }
 
 // null when the rack already has as many as the device allows
@@ -512,7 +625,7 @@ WRContext.prototype.moveModule = function( id, dir )
 // of them when none is running, otherwise stops them all
 WRContext.prototype.transport = function( action, value )
 {
-	var mods = this.modules();
+	var mods = this.flatModules().map( this.panelModule, this );
 	if(action == "play")
 		value = !mods.some(function(m){ return m.state && m.state.playing; });
 	mods.forEach(function(m){
@@ -581,7 +694,7 @@ WRContext.prototype.updateNative = function()
 	if(!this.node || !this.master) // the audio graph is built
 		return;
 	var that = this, ctx = this.context, slot = 0, seen = {};
-	this.settings.modules.forEach(function(m){
+	this.flatModules().forEach(function(m){
 		var def = WR.types[ m.type ];
 		if(!def.native || slot >= WR.SLOTS)
 			return;
@@ -1024,6 +1137,30 @@ WR.migrateRenamed = function( data )
 	return r;
 }
 
+// one module of a saved rack: a known type, an id that matches `pattern` and isn't in `list` (else
+// prefix + its type and a number), settings validated by its device. null for an unknown type
+WR.validateModule = function( m, list, pattern, prefix )
+{
+	if(!m || typeof m != "object" || !WR.types[ m.type ])
+		return null;
+	var def = WR.types[ m.type ];
+	var id = m.id;
+	var taken = function(id){ return list.some(function(o){ return o.id == id; }); };
+	if(typeof id != "string" || !pattern.test( id ) || taken( id ))
+	{
+		id = prefix + m.type;
+		for(var n = 2; taken( id ); ++n)
+			id = prefix + m.type + n;
+	}
+	var raw = m.settings && typeof m.settings == "object" ? m.settings : {};
+	var ms = WR.mergeValid( def.defaults(), raw );
+	if(def.validate)
+		def.validate( ms, raw );
+	if(raw.knob_skin && WR.KNOB_SKINS.indexOf( raw.knob_skin ) > 0) // the device's knob style, if not its default
+		ms.knob_skin = raw.knob_skin;
+	return { id: id, type: m.type, settings: ms };
+}
+
 WRContext.prototype.setSettings = function( data )
 {
 	data = data || {};
@@ -1048,25 +1185,10 @@ WRContext.prototype.setSettings = function( data )
 	// modules: known types only, unique ids, settings validated by their synth
 	s.modules = [];
 	(Array.isArray(data.modules) ? data.modules : []).forEach(function(m){
-		if(!m || typeof m != "object" || !WR.types[ m.type ])
-			return;
-		var def = WR.types[ m.type ];
-		var id = m.id;
-		var taken = function(id){ return s.modules.some(function(o){ return o.id == id; }); };
-		if(typeof id != "string" || !/^[a-z][a-z0-9_]*$/.test( id ) || taken( id ))
-		{
-			id = m.type;
-			for(var n = 2; taken( id ); ++n)
-				id = m.type + n;
-		}
-		var raw = m.settings && typeof m.settings == "object" ? m.settings : {};
-		var ms = WR.mergeValid( def.defaults(), raw );
-		if(def.validate)
-			def.validate( ms, raw );
-		if(raw.knob_skin && WR.KNOB_SKINS.indexOf( raw.knob_skin ) > 0) // the device's knob style, if not its default
-			ms.knob_skin = raw.knob_skin;
-		s.modules.push({ id: id, type: m.type, settings: ms });
+		var v = WR.validateModule( m, s.modules, /^[a-z][a-z0-9_]*$/, "" );
+		if(v) s.modules.push( v );
 	});
+	s.modules.forEach(function(m){ var def = WR.types[ m.type ]; if(def.loaded) def.loaded( m ); }); // with its final id (the SUBRACK names its devices after it)
 
 	var jack_ids = WRContext.jackTypes( s.modules );
 	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){

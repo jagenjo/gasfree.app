@@ -21,6 +21,7 @@ var CABLE_COLORS = ["#e8c547","#e05a47","#4fa3e0","#6cc070","#c77dd8","#ececec",
 var TEXT_COLOR = "#e8e4dc", DIM_COLOR = "#8c8a84";
 
 var rack = new WR.Context();
+var MAIN_RACK = rack; // `rack` is a subrack's while its window is drawn (see SCOPES)
 
 // the rack's scale is the window width times the zoom (toolbar - / +), so by default it fills the
 // width and more devices make it scroll. sx / sy: scroll in screen pixels, with scrollbars
@@ -62,6 +63,64 @@ var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classi
 var knob_tint = null;
 // the colour of the knobs' printed scale (a light panel sets it dark while it draws)
 var knob_scale_color = null;
+
+// ---------------------------------------------------------------------------
+// SCOPES: a rack inside a device (SUBRACK) is drawn in a window of its own by this same code. A scope
+// is that window's canvas, view, pointer, jacks, cables being dragged, front / rear and keys, and
+// its rack (rack.scope( id ): the inner modules and cables). inScope( sc, fn ) runs fn with the
+// globals swapped to the scope's (the drawing and the pointer handlers); SCOPE is the scope being run
+// (null: the main window). sc.io describes its top row: { id, title, h, jacks, rear, note, draw( x, y, w, h ) }
+var SCOPE = null;
+var SCOPE_VARS = ["canvas", "ctx", "view", "ui", "jacks", "cable_drag", "tooltips", "frame", "rack", "show_rear", "hover_control", "keyctl", "PANEL_H", "id_prefix"];
+function scopeGet( k )
+{
+	switch(k)
+	{
+		case "canvas": return canvas; case "ctx": return ctx; case "view": return view; case "ui": return ui;
+		case "jacks": return jacks; case "cable_drag": return cable_drag; case "tooltips": return tooltips;
+		case "frame": return frame; case "rack": return rack; case "show_rear": return show_rear;
+		case "hover_control": return hover_control; case "keyctl": return keyctl; case "PANEL_H": return PANEL_H;
+		case "id_prefix": return id_prefix;
+	}
+}
+function scopeSet( k, v )
+{
+	switch(k)
+	{
+		case "canvas": canvas = v; break; case "ctx": ctx = v; break; case "view": view = v; break; case "ui": ui = v; break;
+		case "jacks": jacks = v; break; case "cable_drag": cable_drag = v; break; case "tooltips": tooltips = v; break;
+		case "frame": frame = v; break; case "rack": rack = v; break; case "show_rear": show_rear = v; break;
+		case "hover_control": hover_control = v; break; case "keyctl": keyctl = v; break; case "PANEL_H": PANEL_H = v; break;
+		case "id_prefix": id_prefix = v; break;
+	}
+}
+function inScope( sc, fn )
+{
+	if(!sc || SCOPE === sc)
+		return fn();
+	var keep = {}, outer = SCOPE;
+	SCOPE_VARS.forEach(function(k){ keep[k] = scopeGet( k ); scopeSet( k, sc.vars[k] ); });
+	SCOPE = sc;
+	try { return fn(); }
+	finally {
+		SCOPE_VARS.forEach(function(k){ sc.vars[k] = scopeGet( k ); scopeSet( k, keep[k] ); });
+		SCOPE = outer;
+	}
+}
+// the globals of a new scope: rack is its rack, the rest starts as the main window's do
+function newScopeVars( r, cv )
+{
+	return {
+		canvas: cv, ctx: cv.getContext( "2d" ), rack: r, jacks: {}, cable_drag: null, tooltips: [], frame: { ox: 0, oy: 0, k: 1 },
+		show_rear: false, hover_control: null, PANEL_H: 0, id_prefix: "",
+		view: { scale: 1, zoom: 1, ox: 0, oy: 0, dpr: 1, sx: 0, sy: 0, max_sx: 0, max_sy: 0, drag: null },
+		ui: { px: -1, py: -1, x: -1, y: -1, down: false, pressed: false, released: false, rpressed: false, dbl: false,
+			shift: false, wheel: 0, wheel_x: 0, active: null, hot: null, startY: 0, startN: 0, dragShift: false, lastDownTime: 0, lastDownPos: [0,0] },
+		keyctl: { target: null, device: null, list: [], ids: [], map: [], keyOf: {}, sig: "", pressed: {}, held: {}, down: {}, flash: {}, bank: 0, overlay: false, rects: [] }
+	};
+}
+// the window being drawn / handled
+function scopeWindow() { return SCOPE ? SCOPE.win : window; }
 
 function beginFrame( ox, oy, k )
 {
@@ -451,7 +510,7 @@ function scrollbarHit( e )
 	return null;
 }
 
-canvas.addEventListener("pointerdown", function(e){
+function onPointerDown(e){
 	toPanel(e);
 	var bar = e.button == 0 && scrollbarHit( e );
 	if(bar)
@@ -478,8 +537,8 @@ canvas.addEventListener("pointerdown", function(e){
 	ui.pressed = true;
 	canvas.setPointerCapture( e.pointerId );
 	e.preventDefault();
-});
-canvas.addEventListener("pointermove", function(e){
+}
+function onPointerMove(e){
 	toPanel(e);
 	var d = view.drag;
 	if(d)
@@ -490,7 +549,7 @@ canvas.addEventListener("pointermove", function(e){
 		else
 			setScroll( d.sx + (e.clientX - d.x) * (view.max_sx + w) / w, view.sy );
 	}
-});
+}
 function onPointerUp(e) {
 	toPanel(e);
 	if(view.drag)
@@ -503,9 +562,7 @@ function onPointerUp(e) {
 	ui.down = false;
 	ui.released = true;
 }
-canvas.addEventListener("pointerup", onPointerUp);
-canvas.addEventListener("pointercancel", onPointerUp);
-canvas.addEventListener("wheel", function(e){
+function onWheel(e){
 	toPanel(e);
 	// shift + wheel (or a sideways wheel) scrolls horizontally, unless a knob takes it
 	if(Math.abs( e.deltaX ) > Math.abs( e.deltaY ))
@@ -514,8 +571,19 @@ canvas.addEventListener("wheel", function(e){
 		ui.wheel += Math.sign( e.deltaY );
 	ui.wheel_ctrl = e.ctrlKey || e.metaKey; // Ctrl (Cmd) + wheel turns the knob even with the option off
 	e.preventDefault();
-}, { passive: false });
-canvas.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+}
+// the pointer on a canvas: the main one, or a scope's (its handlers run in the scope)
+function bindCanvas( cv, sc )
+{
+	var on = function(fn){ return function(e){ inScope( sc, function(){ fn(e); } ); }; };
+	cv.addEventListener( "pointerdown", on( onPointerDown ) );
+	cv.addEventListener( "pointermove", on( onPointerMove ) );
+	cv.addEventListener( "pointerup", on( onPointerUp ) );
+	cv.addEventListener( "pointercancel", on( onPointerUp ) );
+	cv.addEventListener( "wheel", on( onWheel ), { passive: false } );
+	cv.addEventListener( "contextmenu", function(e){ e.preventDefault(); } );
+}
+bindCanvas( canvas, null );
 
 function hitCircle( cx, cy, r ) { var dx = ui.x - cx, dy = ui.y - cy; return dx*dx + dy*dy <= r*r; }
 function hitRect( x, y, w, h ) { return ui.x >= x && ui.x <= x + w && ui.y >= y && ui.y <= y + h; }
@@ -1846,7 +1914,9 @@ function skinButton( m, cx, cy )
 function askRemoveModule( m )
 {
 	// after this frame: a dialog in the middle of the draw loop would lose the pointer release
-	setTimeout(function(){
+	var sc = SCOPE;
+	setTimeout(function(){ inScope( sc, function(){
+		var window = scopeWindow();
 		ui.down = false;
 		ui.active = null;
 		var cables = rack.settings.patches.filter(function(p){ return p[0].indexOf( m.id + "." ) == 0 || p[1].indexOf( m.id + "." ) == 0; }).length;
@@ -1857,7 +1927,7 @@ function askRemoveModule( m )
 		delete collapsed[ m.id ];
 		saveCollapsed();
 		setStatus( "Removed " + m.def.title + " from the rack" + (thru && cables ? " (audio cabled around it)" : "") );
-	}, 0);
+	}); }, 0);
 }
 
 function drawEmptyRack( w )
@@ -2064,6 +2134,8 @@ var device_names = { io: "AUDIO I/O", keys: "KEYS" };
 // [label, "ain" | "aout", jack id] on the back of a device, ids as in the patches
 function rearSockets( id )
 {
+	if(SCOPE && id == SCOPE.io.id)
+		return SCOPE.io.rear;
 	var m = rack.settings.modules.find(function(m){ return m.id == id; });
 	if(m)
 	{
@@ -2084,6 +2156,8 @@ function jackDevice( id )
 		var same = m && rack.settings.modules.filter(function(o){ return o.type == m.type; }).length > 1;
 		return m ? WR.types[ m.type ].title + (same ? " (" + mid + ")" : "") : mid;
 	}
+	if(SCOPE)
+		return SCOPE.io.title;
 	for(var dev in WR.REAR_JACKS)
 		if(WR.REAR_JACKS[dev].some(function(j){ return j[2] == id; }))
 			return device_names[dev];
@@ -2093,6 +2167,8 @@ function jackDevice( id )
 // what the rear sticker says about the device's audio
 function rearNote( id )
 {
+	if(SCOPE && id == SCOPE.io.id)
+		return SCOPE.io.note;
 	switch(id)
 	{
 		case "io": return "MAIN IN TO THE SPEAKERS \u00b7 INPUT FROM THE INTERFACE";
@@ -2320,7 +2396,7 @@ function jackLabel( id )
 {
 	if(jacks[id])
 		return jacks[id].label;
-	var list = [];
+	var list = SCOPE ? SCOPE.io.rear.slice() : [];
 	for(var dev in WR.REAR_JACKS)
 		list = list.concat( WR.REAR_JACKS[dev] );
 	var dot = id.indexOf("."), local = dot > 0 ? id.substr( dot + 1 ) : id;
@@ -2668,7 +2744,7 @@ function draw()
 	if(PREVIEW_TYPE)
 		return drawPreview();
 	var w = canvas.clientWidth, h = canvas.clientHeight;
-	var dpr = window.devicePixelRatio || 1;
+	var dpr = scopeWindow().devicePixelRatio || 1;
 	if(canvas.width != Math.round( w * dpr ) || canvas.height != Math.round( h * dpr ))
 	{
 		canvas.width = Math.round( w * dpr );
@@ -2706,14 +2782,26 @@ function draw()
 
 	ui.hot = null;
 	jacks = {}; // filled again by every row as it draws its jacks
-	beginFrame( 0, 0, 1 );
-	drawDevice( "io", 0, 0, PANEL_W, IO_H, "AUDIO I/O", WR.IO_JACKS, drawIODevice );
-	endFrame();
-	var y = deviceH( "io", IO_H ) + KB_GAP;
-	beginFrame( 0, y, 1 );
-	drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", WR.KB_JACKS, drawKeysDevice );
-	endFrame();
-	y += deviceH( "keys", KB_H ) + KB_GAP;
+	var y = 0;
+	if(SCOPE) // a rack inside a device: its I/O row on top, no keys
+	{
+		var io = SCOPE.io;
+		beginFrame( 0, 0, 1 );
+		drawDevice( io.id, 0, 0, PANEL_W, io.h, io.title, io.jacks, io.draw );
+		endFrame();
+		y = deviceH( io.id, io.h ) + KB_GAP;
+	}
+	else
+	{
+		beginFrame( 0, 0, 1 );
+		drawDevice( "io", 0, 0, PANEL_W, IO_H, "AUDIO I/O", WR.IO_JACKS, drawIODevice );
+		endFrame();
+		y = deviceH( "io", IO_H ) + KB_GAP;
+		beginFrame( 0, y, 1 );
+		drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", WR.KB_JACKS, drawKeysDevice );
+		endFrame();
+		y += deviceH( "keys", KB_H ) + KB_GAP;
+	}
 	y += drawModules( y );
 	updateCables(); // front or rear: only the jacks of the side shown are registered
 	drawCables();
@@ -2875,6 +2963,12 @@ function loop()
 	rack.sync();
 	updateToolbarFrame();
 
+	endUiFrame();
+}
+
+// after a frame: the clicks and wheel steps were taken
+function endUiFrame()
+{
 	ui.pressed = ui.released = ui.rpressed = ui.dbl = false;
 	ui.wheel = ui.wheel_x = 0;
 	ui.wheel_ctrl = false;
@@ -2993,6 +3087,15 @@ var status_timer = null;
 
 function setStatus( text, sticky )
 {
+	if(SCOPE && SCOPE.status) // a subrack's window: its own status line
+	{
+		var el = SCOPE.status, sc = SCOPE;
+		el.textContent = text;
+		clearTimeout( sc.status_timer );
+		if(!sticky)
+			sc.status_timer = setTimeout(function(){ el.textContent = ""; }, 3000);
+		return;
+	}
 	$("status").textContent = text;
 	clearTimeout( status_timer );
 	if(!sticky)
@@ -3046,7 +3149,7 @@ $("power").addEventListener("click", function(){
 });
 function updatePanelHeight()
 {
-	PANEL_H = deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP + modulesH() - KB_GAP;
+	PANEL_H = (SCOPE ? deviceH( SCOPE.io.id, SCOPE.io.h ) + KB_GAP : deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP) + modulesH() - KB_GAP;
 	if(show_rear)
 		PANEL_H += 50; // room for the rear cables hanging below the bottom row
 	if(!PREVIEW_TYPE && canvas.clientHeight) // half a screen of empty rack after the last device

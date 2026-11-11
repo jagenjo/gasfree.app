@@ -64,6 +64,14 @@ GASFREE (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of th
 - `app/index.html?preview=<type>` draws only that device on magenta; the preview script relies on it.
 - Knobs share skins (`WR.KNOB_SKINS`); Ctrl/Cmd + wheel always turns a knob; MIDI learn and computer-keyboard button mapping (`key_prio`) work on every device automatically.
 
+### Racks inside a device (SUBRACK)
+
+- A device with `def.inner` keeps a rack in `settings.inner = { modules, patches }`. The inner modules' ids start with the device's id and `~` (`subrack~mount`), so states, messages, MIDI learn and collapsed rows need no mapping. Cables to its top row use the rack's own jack names (`io_main_l`, `io_input_l`, `kb_midi`) plus `sr_cv1..4`, `sr_k1..4` (macros), `sr_b1..4` (toggle buttons), `sr_out1..4`; `def.inner.map` turns them into the device's jacks.
+- `WR.flatten( settings )` gives the audio thread one flat rack (the device, then its modules; MASTER MIDI inside becomes a cable from the device's MIDI OUT). `rack.flatModules()` is the same list on the main thread (states, native slots, transport).
+- `rack.scope( id )` is a Proxy WRContext whose `settings.modules` / `.patches` are the inner ones; the methods that edit modules and cables work on them, the rest is the rack's.
+- code.js draws a scope's window with the same code: `inScope( sc, fn )` swaps the globals listed in `SCOPE_VARS` (canvas, ctx, view, ui, jacks, cable_drag, rack, show_rear, keyctl...). `SCOPE` is the scope being run, `scopeWindow()` its window (dialogs). Deferred work (setTimeout) has to capture `SCOPE` and run in it again, as `askRemoveModule` does.
+- `WR.validateModule` validates one module (the rack's and the inner ones); `def.loaded( m )` runs after a load with the module's final id.
+
 ### Saving
 
 - A patch is the whole rack (devices, settings, cables). Patches only need fields that differ from the defaults; `validate()` must accept old and partial data.
@@ -138,3 +146,4 @@ The app, README and home page use plain, short, factual sentences: what a contro
 Synths: SUBHARM (polyrhythmic), DRAM (analog percussion), BROTHER-32 (semi-modular with a 32 step sequencer), MAZE (generative), MYSTIC (wave scanning poly with a mod matrix and macros), MOUNT (8 voice wavetable poly), MESIAH-6 (6 voice analog poly with poly mod and a step sequencer), CSS 90 (8 voice poly with two channels a voice, touch response and a ribbon), PARA D (4 oscillator paraphonic), LLM DRAM (80s drum machine), LUNAR 21 (drone machine), MINIMAD (digital paraphonic, touch keyboard, mod matrix), CRATE 60 (pad sampler and sequencer), CUSTOM SYNTH (Synth Editor).
 Sequencing and modulation: GRID 32 (32×32 note matrix), MIDI FX (timing, harmony, scale, arp, echo on the notes), dual LFO, the song sequencer, the KEYS device (on-screen keys, QWERTY piano, MIDI).
 Mixing and effects: mixer, compressor (with scope), reverb, delay, UNIVERSE (granular looper), COSMOS (12 algorithm reverb), HYPER (distortion / bit crusher), PRISM (5 band EQ with a spectrum display), TAPE (wow, flutter, saturation, hiss, tape stop), REROUTE (front to back).
+Utility: REROUTE, SUBRACK (a rack inside a device, in a window of its own).
