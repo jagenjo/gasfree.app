@@ -3214,9 +3214,10 @@ function refreshPatchList( selected )
 	var sel = $("patch-select");
 	var esc = function(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };
 	var html = '<option value="" disabled>Choose a patch\u2026</option>';
-	// factory patches grouped by their "group" (the synths in the rack)
+	// factory patches without a group (Clear) come first, the others grouped by their "group" (the synths in the rack)
+	factory_patches.forEach(function(p, i){ if(!p.group) html += '<option value="f:' + i + '">' + esc(p.name) + '</option>'; });
 	var groups = [];
-	factory_patches.forEach(function(p){ if(groups.indexOf( p.group ) == -1) groups.push( p.group ); });
+	factory_patches.forEach(function(p){ if(p.group && groups.indexOf( p.group ) == -1) groups.push( p.group ); });
 	groups.forEach(function(g){
 		html += '<optgroup label="' + esc(g) + '">';
 		factory_patches.forEach(function(p, i){ if(p.group == g) html += '<option value="f:' + i + '">' + esc(p.name) + '</option>'; });
@@ -3257,7 +3258,6 @@ fetch("data/patches.json")
 	.then(function(r){ return r.json(); })
 	.then(function(list){
 		factory_patches = list;
-		list.forEach(function(p){ p.group = p.group || "Factory"; });
 		refreshPatchList();
 	})
 	.catch(function(){ refreshPatchList(); });
