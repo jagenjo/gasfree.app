@@ -1821,7 +1821,6 @@ function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 // modules below the keys: a full width row each, or two half width devices side by side when they
 // are next to each other in the rack. Panels are scaled to fit the rack's width
 
-var EMPTY_RACK_H = 60;
 
 // width a module gets in the rack
 function slotW( def ) { return def.half ? (PANEL_W - DEVICE_GAP) * 0.5 : PANEL_W; }
@@ -1853,7 +1852,7 @@ function rackRows( mods )
 function modulesH()
 {
 	if(!rack.settings.modules.length)
-		return EMPTY_RACK_H + KB_GAP;
+		return KB_GAP;
 	return rackRows().reduce(function(h, r){ return h + r.h + KB_GAP; }, 0);
 }
 
@@ -1930,12 +1929,6 @@ function askRemoveModule( m )
 	}); }, 0);
 }
 
-function drawEmptyRack( w )
-{
-	drawCasing( 0, 0, w, EMPTY_RACK_H );
-	drawLabel( "THE RACK IS EMPTY: INSERT DEVICES WITH \u201cADD DEVICE\u201d IN THE TOOLBAR", w * 0.5, EMPTY_RACK_H * 0.5, 14, false, DIM_COLOR );
-}
-
 // at the end of the rack: a rounded outline button with a plus that opens the ADD DEVICE panel
 var ADD_BTN_H = 70, ADD_BTN_BH = 38;
 function drawAddDeviceButton( y0 )
@@ -1978,10 +1971,7 @@ function drawModules( y0 )
 	view.half_rows = [];
 	if(!mods.length)
 	{
-		beginFrame( 0, y0, 1 );
-		drawEmptyRack( PANEL_W );
-		endFrame();
-		return EMPTY_RACK_H + KB_GAP;
+		return KB_GAP;
 	}
 	var y = y0;
 	rackRows( mods ).forEach(function(row){
@@ -3415,8 +3405,10 @@ function filterAddPanel()
 	});
 }
 
+var add_opened_at = 0;
 function openAddPanel()
 {
+	add_opened_at = performance.now(); // the click that follows the press that opened it must not close it
 	renderAddPanel();
 	$("add-panel").hidden = false;
 	$("add-device").classList.add( "on" );
@@ -3438,7 +3430,7 @@ $("add-panel").addEventListener("click", function(e){
 	if(addDevice( card.getAttribute( "data-type" ) ))
 		closeAddPanel();
 });
-document.addEventListener("click", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
+document.addEventListener("click", function(){ if(!$("add-panel").hidden && performance.now() - add_opened_at > 500) closeAddPanel(); });
 document.addEventListener("keydown", function(e){ if(e.key == "Escape" && !$("add-panel").hidden) closeAddPanel(); });
 canvas.addEventListener("pointerdown", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
 
