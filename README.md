@@ -131,7 +131,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars, or grab the rack by the wood sides of any row (or the empty space around it) and drag.
   - Dragging a cable near the edge of the window scrolls toward it.
 - **Rear view:** **Tab** (or *Rear* in the toolbar) turns the rack around, as in Propellerhead Reason. The back of every device has its audio sockets, patched with cables like the front.
-- **Power button:** the round button on the left of every device's back switches it off. An off device makes no sound, passes nothing on (the cables to and from it stop carrying) and takes no CPU, and its front is dimmed. Switching it on starts it fresh. The state is saved with the patch. The devices inside an off SUBRACK go off with it.
+- **Power button:** the red rocker switch on the left of every device's back switches it off. An off device makes no sound, passes nothing on (the cables to and from it stop carrying) and takes no CPU, and its front is dimmed. Switching it on starts it fresh. The state is saved with the patch. The devices inside an off SUBRACK go off with it.
   - Sockets:
     - each synth's AUDIO OUT (mono, after its volume)
     - the mixer's inputs and outputs
