@@ -1759,6 +1759,45 @@ function collapseButton( id, cx, cy )
 	ctx.stroke();
 }
 
+// the power button on the back of a device (and its dimming): off, the device makes no sound, passes
+// nothing on and takes no CPU (webrack.js: WR.flatten leaves it out). The state is the module's `off`
+function setModuleOff( id, off )
+{
+	var m = rack.settings.modules.find(function(o){ return o.id == id; });
+	if(!m)
+		return;
+	if(off) m.off = true; else delete m.off;
+	if(off) // its notes and gates stop with it
+		rack.allNotesOff();
+}
+function powerButton( id, off, cx, cy )
+{
+	var hover = !cable_drag && ui.active === null && hitCircle( cx, cy, 10 );
+	if(hover)
+	{
+		ui.hot = "power_" + id;
+		tip( off ? "POWER ON" : "POWER OFF: no sound, no routing, no CPU", cx + 30, cy + 2 );
+	}
+	if(hover && ui.pressed)
+	{
+		ui.active = "power_" + id;
+		setModuleOff( id, !off );
+	}
+	ctx.fillStyle = hover ? "#4a4a46" : "#2c2c2a";
+	ctx.beginPath(); ctx.arc( cx, cy, 9, 0, Math.PI * 2 ); ctx.fill();
+	ctx.strokeStyle = off ? "#777772" : "#e0a53a";
+	ctx.lineWidth = 1.8;
+	ctx.beginPath(); ctx.arc( cx, cy + 0.5, 4.6, -Math.PI * 0.5 + 0.7, Math.PI * 1.5 - 0.7 ); ctx.stroke();
+	ctx.beginPath(); ctx.moveTo( cx, cy - 6 ); ctx.lineTo( cx, cy - 0.5 ); ctx.stroke();
+}
+function dimOff( m, w, h )
+{
+	if(!m.off)
+		return;
+	ctx.fillStyle = "rgba(8,8,8,0.55)";
+	ctx.fillRect( 0, 0, w, h );
+}
+
 function drawMiniJack( id, x, y, label, type )
 {
 	id = id_prefix + id;
@@ -1993,6 +2032,9 @@ function drawModules( y0 )
 				}
 				else
 					drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
+				dimOff( m, collapsed[ m.id ] ? w : fit.w, collapsed[ m.id ] ? DEVICE_COLLAPSED_H : fit.h );
+				if(!collapsed[ m.id ])
+					powerButton( m.id, m.off, 36, 32 );
 				endFrame();
 			}
 			else if(collapsed[ m.id ])
@@ -2001,6 +2043,7 @@ function drawModules( y0 )
 				id_prefix = m.id + ".";
 				var end = drawCollapsedBar( m.id, 0, 0, w, m.def.title, m.def.jacksOf ? m.def.jacksOf( m.settings ) : m.def.jacks );
 				id_prefix = "";
+				dimOff( m, w, DEVICE_COLLAPSED_H );
 				moduleButtons( m, i, mods.length, function(k){ return [ end + 22 + k * 22, DEVICE_COLLAPSED_H * 0.5 ]; } );
 				endFrame();
 			}
@@ -2017,6 +2060,7 @@ function drawModules( y0 )
 				knob_skin = null;
 				id_prefix = "";
 				collapseButton( m.id, 36, 11 );
+				dimOff( m, fit.w, fit.h );
 				// on the right wood cheek
 				moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );
 				endFrame();

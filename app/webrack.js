@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261111l"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261111m"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -383,7 +383,7 @@ WRContext.prototype.panelModule = function( m )
 {
 	var that = this;
 	return {
-		id: m.id, type: m.type, def: WR.types[ m.type ], settings: m.settings,
+		id: m.id, type: m.type, def: WR.types[ m.type ], settings: m.settings, off: !!m.off,
 		state: that.module_state[ m.id ] || null,
 		post: function(msg){ that.postModule( m.id, msg ); }
 	};
@@ -408,10 +408,20 @@ WRContext.prototype.flatModules = function()
 	return list;
 }
 
+// A module switched off (m.off) is left out of the flat rack, with the cables to and from it: it makes
+// no sound, passes nothing on and takes no CPU. The devices inside an off SUBRACK go with it.
+WR.jackModule = function( jack ) { var i = String( jack ).indexOf( "." ); return i < 0 ? "" : jack.substr( 0, i ); }
+
 WR.flatten = function( s )
 {
-	var mods = [], patches = s.patches.slice();
+	var mods = [], patches = s.patches.slice(), off = [];
 	s.modules.forEach(function(m){
+		if(m.off)
+		{
+			off.push( m.id );
+			(m.settings.inner ? m.settings.inner.modules : []).forEach(function(o){ off.push( o.id ); });
+			return;
+		}
 		mods.push( m );
 		var def = WR.types[ m.type ], inner = m.settings.inner;
 		if(!def.inner || !inner)
@@ -422,6 +432,7 @@ WR.flatten = function( s )
 			return k ? WR.jackId( m.id, k ) : null;
 		};
 		inner.modules.forEach(function(o){
+			if(o.off) { off.push( o.id ); return; }
 			var d = WR.types[ o.type ];
 			if(d.midi_in && o.settings.midi_master)
 			{
@@ -438,7 +449,9 @@ WR.flatten = function( s )
 	var r = {};
 	for(var k in s) r[k] = s[k];
 	r.modules = mods;
-	r.patches = patches;
+	r.patches = off.length ? patches.filter(function(p){
+		return !off.some(function(id){ return WR.jackModule( p[0] ) == id || WR.jackModule( p[1] ) == id; });
+	}) : patches;
 	return r;
 }
 
@@ -636,7 +649,7 @@ WRContext.prototype.transport = function( action, value )
 	if(action == "play" && value === undefined) // no value: toggle
 		value = !mods.some(function(m){ return m.state && m.state.playing; });
 	mods.forEach(function(m){
-		if(m.def.transport)
+		if(m.def.transport && !m.off)
 			m.def.transport( m, action, value );
 	});
 }
@@ -703,7 +716,7 @@ WRContext.prototype.updateNative = function()
 	var that = this, ctx = this.context, slot = 0, seen = {};
 	this.flatModules().forEach(function(m){
 		var def = WR.types[ m.type ];
-		if(!def.native || slot >= WR.SLOTS)
+		if(!def.native || slot >= WR.SLOTS || m.off)
 			return;
 		var k = 1 + slot++;
 		var g = that.native[ m.id ];
@@ -1165,7 +1178,10 @@ WR.validateModule = function( m, list, pattern, prefix )
 		def.validate( ms, raw );
 	if(raw.knob_skin && WR.KNOB_SKINS.indexOf( raw.knob_skin ) > 0) // the device's knob style, if not its default
 		ms.knob_skin = raw.knob_skin;
-	return { id: id, type: m.type, settings: ms };
+	var out = { id: id, type: m.type, settings: ms };
+	if(m.off === true) // switched off with the power button on its back
+		out.off = true;
+	return out;
 }
 
 WRContext.prototype.setSettings = function( data )
