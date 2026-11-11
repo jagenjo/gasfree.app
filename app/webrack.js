@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261111d"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261111f"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -211,7 +211,7 @@ WRContext.addModuleTo = function( s, type )
 
 WR.isMixerInput = function( s, id )
 {
-	return s.modules.some(function(m){ return m.type == "mixer" && id.indexOf( m.id + ".in" ) == 0; });
+	return s.modules.some(function(m){ var d = WR.types[ m.type ]; return d && d.mixer && id.indexOf( m.id + ".in" ) == 0; });
 }
 
 // cables a new module's audio in: a synth goes to a free mixer channel, or where the other synths
@@ -231,6 +231,13 @@ WRContext.routeAudio = function( s, m )
 		s.patches = s.patches.filter(function(p){ return loose.indexOf( p ) == -1; });
 		loose.slice( 0, def.channels ).forEach(function(p, k){
 			s.patches.push([ p[0], WR.jackId( m.id, "in" + (k + 1) ), p[2] ]);
+			// a stereo synth: its right output went to the same place, it would still sound there around the mixer
+			var o = s.modules.find(function(o){ return p[0].indexOf( o.id + "." ) == 0; }), d = o && WR.types[ o.type ];
+			if(d && d.audio_out_r && p[0] == WR.jackId( o.id, d.audio_out ))
+			{
+				var right = WR.jackId( o.id, d.audio_out_r );
+				s.patches = s.patches.filter(function(q){ return !(q[0] == right && !WR.isMixerInput( s, q[1] )); });
+			}
 		});
 		var types = WRContext.jackTypes( s.modules );
 		var right = /_l$/.test( dest ) && types[ dest.replace(/_l$/, "_r") ] ? dest.replace(/_l$/, "_r") : dest;

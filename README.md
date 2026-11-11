@@ -30,6 +30,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/lunar.js`, `app/devices/lunar-worklet.js` | the Lunar 21 drone machine |
 | `app/previews/`, `tools/make-previews.sh` | the devices' pictures for ADD DEVICE, and the script that makes them |
 | `app/devices/mixer.js`, `app/devices/mixer-worklet.js` | the 6 channel mixer |
+| `app/devices/minimix.js`, `app/devices/minimix-worklet.js` | Minimix, the 8 channel mixer in a thin row |
 | `app/devices/lfo.js`, `app/devices/lfo-worklet.js` | the dual LFO |
 | `app/devices/comp.js`, `app/devices/comp-worklet.js` | the stereo compressor and its scope |
 | `app/devices/delay.js`, `app/devices/delay-worklet.js` | the stereo / ping-pong delay |
@@ -157,6 +158,14 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
   - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
   - Add both files to `index.html`.
+
+## Minimix
+
+A very simple mixer in a thin full-width row, just tall enough for a knob and its name. Insert it from *Add device* (Mixing).
+
+- **Front:** a LEVEL knob for each of the 8 channels, named after what is cabled into it (the device's name, or CH 1-8), and a MASTER knob with a signal LED. No front jacks. Knob values show in dB; 0.75 is 0 dB (double click resets).
+- **Back (Tab):** IN 1-8 (mono line inputs) and MAIN L / MAIN R, the same mix on both.
+- **Adding it:** like the Mixer, it takes over the synths that go straight to the speakers or the effects (a stereo synth's right output is unplugged, as the mix is mono).
 
 ## Mixer
 
