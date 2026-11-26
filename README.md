@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a six voice analog polysynth (Mesiah-6), an eight voice polysynth with two channels a voice (CSS 90), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), a rack inside a device (Subrack), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a six voice analog polysynth (Mesiah-6), an eight voice polysynth with two channels a voice (CSS 90), an electric piano made by physical modelling, with tines or reeds (Hammer 88), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), a pad sampler and sequencer (Crate 60), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper), a tape machine (Tape) and an equalizer with a spectrum display (Prism), a rack inside a device (Subrack), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -44,6 +44,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `app/devices/mesiah6.js`, `app/devices/mesiah6-worklet.js` | Mesiah-6, the six voice analog polysynth |
 | `app/devices/css90.js`, `app/devices/css90-worklet.js` | CSS 90, the eight voice polysynth with two channels a voice |
+| `app/devices/hammer.js`, `app/devices/hammer-worklet.js` | Hammer 88, the electric piano made by physical modelling (tines or reeds) |
 | `app/devices/crate.js`, `app/devices/crate-worklet.js` | Crate 60, the pad sampler and sequencer (its factory kit is made in `crate.js` and sent to the DSP) |
 | `app/devices/minimad.js`, `app/devices/minimad-worklet.js` | MiniMad, the digital paraphonic synthesizer with a touch keyboard (the worklet file is also loaded on the page, for its tables) |
 | `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
@@ -287,6 +288,29 @@ An eight voice polysynth laid out as the classic one it follows: two rows of sli
 - **CV jacks:** inputs BRILL (the cutoff of all the filters, 1 V/oct), VOL (expression, 0-5 V) and SUS; outputs PITCH, GATE, SUB (the sub oscillator) and RIBBON.
 - **Factory patches:** *Swelling Brass*, *Ring Bells*, *Ribbon Solo* and *String Ensemble*.
 - **Simplified:** the presets load into the sliders (the panel always shows what plays); the oscillators are digital models; per note aftertouch needs a controller that sends it; no knee lever or foot pedals other than sustain.
+
+## Hammer 88
+
+An electric piano made by physical modelling, with no samples. Every key has its own bar, struck by its own felt hammer and read by its own pickup, and the sound comes from how they move. Play it from the keys, a MIDI device or the song sequencer; OUT L / OUT R are on the back. The window on top shows the 88 bars (tines under their tone bars, or reeds) moving as they sound, and the keys held.
+
+- **How it works:**
+  - **The bar** vibrates in its bending modes (a rod clamped at one end: 1, 6.3, 17.6 and 34.4 times the fundamental). The high modes die in a fraction of a second, the fundamental rings on.
+  - **The hammer** is a mass thrown at the bar at the key's speed, with a felt spring between them that gets stiffer as it is squeezed. A harder blow squeezes the felt more and the contact is shorter, so loud notes are brighter on their own. A key played again strikes its bar while it still moves.
+  - **TINE:** the tine sits under a tone bar, a second resonator tuned near it that keeps the fundamental going (and beats against it when it is a little out of tune). An electromagnetic pickup reads it: the voltage is the slope of the magnet's field at the tip times the tip's speed. A tine aimed at the magnet's axis gives mostly the octave (a bell); aimed off the axis, more fundamental; a big swing near the magnet, the bark.
+  - **REED:** a steel reed with solder at its tip, read by an electrostatic pickup: the voltage follows the reed's place in the charged plate, which gives the nasal sound and the growl of the loud notes.
+  - **The dampers** stop the bar when the key comes up, unless the sustain pedal or SUS holds them off. As on a tine piano, the top keys (from C7) have no dampers.
+- **TINE / REED:** the kind of bar and pickup.
+- **BAR:** DECAY (how long the notes ring, from about a third to almost 3 times), AGE (each key a little different: tuning, pickup aim, decay, and the tone bars' beating).
+- **ACTION:** HAMMER (soft felt: round; hard felt: bright, with more attack), DAMPER (how fast the damper stops a note, 12 ms to 0.6 s).
+- **PICKUP:** ALIGN (where the tips point: at the axis, the octave; off it, either way, the fundamental), NEAR (the pickup's distance: near, the sound barks or growls sooner), MECH (the thump of the hammers and of the dampers landing).
+- **AMP:** DRIVE (a tube preamp for the tines, a transistor stage for the reeds), BASS and TREBLE (shelves at 250 Hz and 2.5 kHz, ±6).
+- **TREMOLO:** RATE (0.4 to 10 Hz), DEPTH (at the bottom: off), STEREO (on: the sound goes from side to side; off: the level goes up and down). The LED follows it.
+- **OUTPUT:** VOLUME, TUNE (±50 cents).
+- **Presets:** WARM, BELL, BARK, PANNER (tines) and REED, GROWL (reeds) set the knobs.
+- **CV jacks:** inputs PITCH (1 V/oct, 0 V is C4), GATE and VEL (0-5 V; unplugged: 0.8) play one more note; SUS (a gate holds the dampers off); TREM (added to DEPTH). Output TREM OUT (the tremolo, ±5 V).
+- **Pitch bend** and the **sustain pedal** from a MIDI device work.
+- **Factory patches:** *Tine Ballad*, *Bell Tines*, *Reed Growl*.
+- **Simplified:** 24 keys sound at once; each bar has 4 modes (plus the tone bar or a torsion mode); there is no half pedalling, and no tines that buzz against their dampers.
 
 ## Grid 32
 
@@ -724,7 +748,7 @@ MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, a **M
 - **Keys:** the same selector under the keys' MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
 - **A device's MIDI OUT** (the MIDI FX): its notes go only to the devices cabled from it, whatever channel they listen to. A device fed only that way doesn't hear the keys. One MIDI OUT can feed several devices; a MIDI IN takes one cable.
 - **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
-- **Controllers:** pitch bend, the mod wheel (CC 1), channel aftertouch, polyphonic aftertouch and the sustain pedal (CC 64) from a MIDI device reach the synths on their channel, and pass through the MIDI FX. The MYSTIC uses the mod wheel and aftertouch as sources of its mod matrix, the MESIAH-6 uses the mod wheel and channel aftertouch, the CSS 90 all of them; the other devices ignore them.
+- **Controllers:** pitch bend, the mod wheel (CC 1), channel aftertouch, polyphonic aftertouch and the sustain pedal (CC 64) from a MIDI device reach the synths on their channel, and pass through the MIDI FX. The MYSTIC uses the mod wheel and aftertouch as sources of its mod matrix, the MESIAH-6 uses the mod wheel and channel aftertouch, the CSS 90 all of them, the HAMMER 88 pitch bend and the sustain pedal; the other devices ignore them.
 
 ## Keys device and MIDI
 
@@ -751,7 +775,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 68 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, CSS 90, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth), SUBRACK and RACK (several devices together), plus your own, and Clear (an empty rack) at the top.
+  - The toolbar menu has 71 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, MESIAH-6, CSS 90, HAMMER 88, LLM DRAM, LUNAR 21, PARA D, MOUNT, MINIMAD, CRATE 60 (at least three for every synth), SUBRACK and RACK (several devices together), plus your own, and Clear (an empty rack) at the top.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
