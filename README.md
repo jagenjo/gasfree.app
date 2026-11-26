@@ -435,16 +435,17 @@ A granular / looper / delay effect pedal. It is a half-width effect with stereo 
   | MOSAIC | normal + double speed | normal + half speed | all loops double speed | half, normal, double, 4× | loopers active (1–4) |
   | SEQ | filtered, shuffled random rhythms | normal / half speed, sustainer at full ACTIVITY | overlapping layers with filter sweeps | interlocking bit-crushed layers, crushed sub octave at full ACTIVITY | variation / layers |
   | GLIDE | half ↔ normal | double ↔ half | normal ↔ double | both directions at once | glide speed (SHAPE: the glide pattern) |
-  | HAZE | short, diffuse, stretched | many random grains | normal + double speed grains | normal + half speed grains | density and spread |
-  | TUNNEL | drone compresses and lengthens | sub octave drone, filter sweeps | resonant band passes | envelope-triggered, per note | depth (REPEATS: drone decay) |
-  | STRUM | repeats the last note | overlapping copies: phasing | cascading chains of recent notes | chains + double speed grains | density |
+  | HAZE | stretched: the grains read from a point that moves slower than time | many short random grains | normal + double speed grains | normal + half speed grains | density and spread (REPEATS: the cloud fed back into the buffer) |
+  | TUNNEL | the micro-loop compresses and lengthens | sub octave drone, filter sweeps | a resonant band pass for each note, drifting | each note squeezes the loop, then it lengthens | depth of the modifier (REPEATS: drone decay) |
+  | STRUM | the last note again, 1 to 4 hits a step | copies a few ms apart, a hair out of tune: phasing | rolls of recent notes across the step | rolls + double speed grains | density of the pattern |
   | BLOCKS | rearranged + bursts of notes | rearranged, pitch-shifted | soft: filtered, fading samples | pitch-shifted + bit-crushed | variation |
   | INTERRUPT | rearranged playing cuts in | pitch-shifted | filter sweeps and delay | bit-crushed, drastic | variation (REPEATS: how often) |
   | ARP | arpeggios of the last note | pitch-shifted speed pattern | a random filter each step | bit-crushed | arpeggio steps |
   | PATTERN | rhythm 1, classic delay | rhythm 2 | rhythm 3 | rhythm 4 | delay taps (REPEATS: feedback) |
   | WARP | envelope filter on each tap | resonant band pass on each tap | pitch-shifted taps | taps + double speed grains | delay taps (REPEATS: feedback) |
 
-  STRUM, BLOCKS, INTERRUPT, ARP and TUNNEL D find the notes by detecting onsets in the input. **REV** plays the effect backwards (pressing the preset knob on the pedal).
+  HAZE plays a cloud of 12 to 160 overlapping grains a second, each a few cents off and placed across the stereo field; its level stays even as ACTIVITY adds grains. TUNNEL takes a new drone from each note (just after its attack): a micro-loop an eighth of a step long (20 to 250 ms), overlapped so it never stops; the drone fades in the time set by REPEATS. HAZE and TUNNEL grains have smooth edges, and SHAPE moves their weight from the start (a quick rise, a long fade) to the end (a swell). When all 48 grains are playing, the oldest fades out to make room.
+  STRUM, BLOCKS, INTERRUPT, ARP and TUNNEL D find the notes by detecting onsets in the input; their grains start just before each attack. **REV** plays the effect backwards (pressing the preset knob on the pedal).
 - **Knobs:** ACTIVITY ("more or less" of the effect), REPEATS (elsewhere: how many times each sample echoes), SHAPE (the samples' envelope: percussive, flat, swell), FILTER (resonant low pass on the effect), MIX, TIME (¼×, ½×, 1×, 2×, 4×, 8× the tempo), SPACE (reverb) and LOOP LEVEL.
 - **Secondary controls** (shift functions on the pedal) are the small knobs: MOD depth and RATE (pitch modulation), RES (filter resonance), VOL (effect volume), TEMPO, REVERB (ROOM, HALL, CATHEDRAL, AMBIENT WASH) and the looper SPEED (¼× to 4×).
 - **Tempo:** SYNC follows the rack's tempo. TAP (or TEMPO) sets its own and turns SYNC off. MIDI clock or a cable in CLOCK takes over.

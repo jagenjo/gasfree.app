@@ -18,7 +18,8 @@ const I_L = 0, I_R = 1, I_CLOCK = 2, I_HOLD = 3, I_ACT = 4, I_MIX = 5;
 const O_L = 0, O_R = 1, O_CLOCK = 2, O_ENV = 3;
 const RING = 1 << 19;          // samples kept (about 11 s at 48 kHz), power of two
 const MASK = RING - 1;
-const MAX_GRAINS = 32;
+const MAX_GRAINS = 48;
+const KILL = 128;               // a grain taken for a new one fades out in this many samples
 const TIMES = [4, 2, 1, 0.5, 0.25, 0.125]; // TIME: beats a step (1/4x, 1/2x, the tapped tempo, 2x, 4x, 8x)
 const LOOPER_SPEEDS = [0.25, 0.5, 1, 2, 4];
 const LOOPER_SECONDS = 60;
@@ -64,8 +65,9 @@ class UniverseDSP {
 		this.envFast = 0; this.envSlow = 0; this.onsetHold = 0;
 		this.duck = 1;                 // INTERRUPT: dry signal ducked during a glitch
 		this.duckTimer = 0;
-		this.hazeLag = 0.2;            // HAZE A: the stretched read position (seconds back)
-		this.drone = { off: 0, level: 0 }; // TUNNEL
+		this.hazeLag = 0.1;            // HAZE A: the stretched read position (seconds back)
+		this.hazeT = 0;                // HAZE: samples to the next grain
+		this.drone = { src: -1, level: 0, t: 0, since: 0 }; // TUNNEL: the source (absolute position), its level
 		this.tapS = new Float64Array(16); // WARP: filter state of each tap (4 taps x 4)
 		this.modPh = 0;
 		this.lpL = [0, 0]; this.lpR = [0, 0];
@@ -129,7 +131,11 @@ class UniverseDSP {
 	// echoes (plays again that many times, quieter: REPEATS)
 	spawn(off, len, rate, o) {
 		o = o || {};
-		if (this.grains.length >= MAX_GRAINS) this.grains.shift();
+		if (this.grains.length >= MAX_GRAINS) {
+			const old = this.grains.find(g => !g.kill);
+			if (old) old.kill = KILL;
+			if (this.grains.length >= MAX_GRAINS + 16) this.grains.shift();
+		}
 		off = clamp(off, 16, RING - 16);
 		len = clamp(len, 16, off);
 		if (this.s.fx_reverse) rate = -rate;
@@ -144,7 +150,7 @@ class UniverseDSP {
 			crush: o.crush || 0, held: 0, hx: 0, hy: 0,
 			ft: f ? f[0] : F_NONE, fc: f ? f[1] : 0, fc2: f ? (f[2] || f[1]) : 0, q: f ? f[3] : 1,
 			l0: 0, b0: 0, l1: 0, b1: 0,
-			echoes: o.echoes === undefined ? this.echoes : o.echoes, flat: !!o.flat
+			echoes: o.echoes === undefined ? this.echoes : o.echoes, flat: !!o.flat, win: !!o.win, kill: 0
 		});
 	}
 
@@ -209,25 +215,24 @@ class UniverseDSP {
 				if (v === 3) this.spawn(L, L / 2, pairs[1], { rate2: pairs[0], cycles: cyc, loop: true, life: L * 2, gain: 0.5, flat: true });
 				break;
 			}
-			case 4: // TUNNEL: a new drone source every 8 steps (D: on each note)
-				if (v !== 3 && c % 8 === 1) this.drone.off = Math.min(this.w, Math.round(L * 2));
-				break;
-			case 5: { // STRUM: chains of recent note onsets; ACTIVITY = density
-				const len = Math.min(L, 0.4 * sr);
-				if (v === 0) { // A: the most recent note again and again
-					this.spawn(this.onsetOff(0, len), len, 1, { gain: 0.65 });
-					if (Math.random() < act) this.later_(L / 2, this.onsetOff(0, len), len, 1, { gain: 0.55 });
+			case 5: { // STRUM: rhythmic chains of recent note onsets, pointillistic; ACTIVITY = density of the pattern
+				const len = Math.min(L, 0.3 * sr) * rnd(0.7, 1);
+				if (v === 0) { // A: the most recent note, again and again: 1 to 4 hits a step, the ones between by chance
+					const hits = 1 + Math.round(act * 3);
+					for (let i = 0; i < hits; i++)
+						if (i === 0 || Math.random() < 0.4 + act * 0.6)
+							this.later_(i * L / hits, this.onsetOff(0, len), len, 1, { gain: (i ? 0.45 : 0.6) * rnd(0.8, 1), pan: rnd(-0.7, 0.7) });
 				}
-				else if (v === 1) { // B: many overlapping copies of the last onset: phasing
-					const n = 2 + Math.round(act * 6);
+				else if (v === 1) { // B: many copies of the last onset, a few ms apart and a hair out of tune: phasing
+					const n = 2 + Math.round(act * 8);
 					for (let i = 0; i < n; i++)
-						this.later_(i * 0.006 * sr, this.onsetOff(0, len), len, 1 + (i - n / 2) * 0.0025, { gain: 0.6 / Math.sqrt(n) });
+						this.later_(i * rnd(0.003, 0.012) * sr, this.onsetOff(0, len), len, 1 + rnd(-1, 1) * (0.002 + act * 0.006), { gain: 0.65 / Math.sqrt(n), pan: (i / Math.max(1, n - 1) - 0.5) * 1.6 });
 				}
-				else { // C: cascading chains of recent onsets (D: + double speed grains)
-					const n = 1 + Math.round(act * 6), gap = L / (n + 1);
+				else { // C: cascading chains of recent onsets, a roll across the step (D: every other one at double speed)
+					const n = 2 + Math.round(act * 6), gap = L / n, dir = c % 2 ? 1 : -1;
 					for (let i = 0; i < n; i++) {
 						const dbl = v === 3 && i % 2 === 1;
-						this.later_(i * gap, this.onsetOff(i, len), dbl ? len / 2 : len, dbl ? 2 : 1, { gain: 0.6 * Math.pow(0.85, i) });
+						this.later_(i * gap * rnd(0.9, 1.1), this.onsetOff(i, len), len, dbl ? 2 : 1, { gain: 0.6 * Math.pow(0.86, i), pan: dir * (i / Math.max(1, n - 1) - 0.5) * 1.4 });
 					}
 				}
 				break;
@@ -304,7 +309,7 @@ class UniverseDSP {
 		this.act = clamp(s.activity + (this.patched[I_ACT] ? this.ins[I_ACT] / 5 : 0), 0, 1);
 		this.mix = clamp(s.mix + (this.patched[I_MIX] ? this.ins[I_MIX] / 5 : 0), 0, 1);
 		this.fx = Math.floor(s.preset / 4);
-		// REPEATS: echoes of each grain (INTERRUPT: how often; TUNNEL: decay; MULTIDELAY: feedback)
+		// REPEATS: echoes of each grain (INTERRUPT: how often; TUNNEL: decay; HAZE: the cloud fed back; MULTIDELAY: feedback)
 		this.echoes = this.fx === 7 || this.fx === 4 || this.fx >= 9 ? 0 : Math.floor(s.repeats * 6.99);
 		this.fc = 2 * Math.sin(Math.PI * Math.min(150 * Math.pow(120, s.filter), sr * 0.2) / (2 * sr));
 		this.q = 2 - s.resonance * 1.9;
@@ -338,41 +343,63 @@ class UniverseDSP {
 	// the continuous effects: HAZE (clusters of grains) and TUNNEL (drone loops)
 	continuous() {
 		const s = this.s, sr = sampleRate, act = this.act, v = s.preset % 4, L = this.stepLen;
-		if (this.fx === 3 && --this.spawnTimer <= 0) { // HAZE; ACTIVITY = grain density and spread
-			this.spawnTimer = Math.round((0.22 - act * 0.2) * sr * rnd(0.6, 1.4) * (v === 1 ? 0.5 : 1));
-			const len = (0.05 + (1 - act) * 0.15) * sr * rnd(0.7, 1.3), spread = (0.05 + act * 1.5) * sr;
-			let off, rate = 1;
-			if (v === 0) { // A: stretched overlapping samples: the read position lags behind, slowly
-				this.hazeLag += 0.5 * (0.22 - act * 0.2) * rnd(0.6, 1.4);
-				if (this.hazeLag > 1.5) this.hazeLag = 0.15;
-				off = this.hazeLag * sr + len;
+		if (this.fx === 3 && --this.hazeT <= 0) { // HAZE: a cloud of overlapping grains; ACTIVITY = density and spread
+			// grains a second and their length: B the most and the shortest
+			const rate = v === 1 ? 30 + act * 130 : 12 + act * 60;
+			const len = (v === 1 ? 0.03 + (1 - act) * 0.09 : 0.07 + (1 - act) * 0.12) * sr * rnd(0.6, 1.4);
+			this.hazeT = Math.max(16, Math.round(sr / rate * rnd(0.5, 1.5)));
+			const spread = (0.02 + act * act * (v === 1 ? 2 : 1.2)) * sr;
+			let off, r = 1;
+			if (v === 0) { // A: stretched: the grains read from a point that moves at a fraction of real time
+				const speed = 0.5 - act * 0.4;
+				this.hazeLag += (1 - speed) * this.hazeT / sr;
+				if (this.hazeLag > 0.4 + act * 1.6) this.hazeLag = 0.05;
+				off = this.hazeLag * sr + len + Math.random() * 0.03 * sr;
 			}
 			else off = len + Math.random() * spread;
-			if (v === 1) rate = 1 + rnd(-0.01, 0.01);
-			if (v === 2) rate = pick([1, 2]);
-			if (v === 3) rate = pick([1, 0.5]);
-			this.spawn(off, len, rate, { gain: v === 1 ? 0.3 : 0.4, echoes: 0, pan: rnd(-0.9, 0.9) });
+			if (v === 2) r = Math.random() < 0.5 ? 2 : 1;  // C: normal and double speed
+			if (v === 3) r = Math.random() < 0.5 ? 0.5 : 1; // D: normal and half speed
+			r *= Math.pow(2, rnd(-1, 1) * (0.02 + act * 0.12) / 12); // a few cents each way: diffusion
+			const overlap = Math.max(1, rate * len / sr / r);
+			this.spawn(off, len, r, { gain: 0.75 / Math.sqrt(overlap), echoes: 0, pan: rnd(-0.95, 0.95), win: true });
 		}
-		if (this.fx === 4) { // TUNNEL: overlapping drone loops; ACTIVITY = how deep the modifier, REPEATS = decay
+		if (this.fx === 4) { // TUNNEL: micro-loops of the last note, overlapped into a drone; ACTIVITY = the modifier's depth, REPEATS = decay
 			const d = this.drone;
-			if (v === 3 && this.sampleCount === this.lastOnset) { d.off = Math.min(this.w, Math.round(L * 2)); }
+			d.t += 1 / sr; d.since++;
+			// each note gives the drone a new source, just past its attack, and its full level
+			if (this.sampleCount === this.lastOnset || d.src < 0) {
+				d.src = this.w + Math.round(0.03 * sr); d.since = 0; d.band = pick([250, 500, 750, 1000, 1500]);
+				if (this.sampleCount === this.lastOnset) d.level = 1;
+			}
 			d.level *= Math.exp(-1 / ((0.4 + s.repeats * s.repeats * 20) * sr));
-			if (this.sampleCount - this.lastOnset < 64) d.level = 1;
 			if (--this.spawnTimer <= 0) {
-				this.spawnTimer = Math.round(L / 2);
-				if (!d.off) d.off = Math.min(this.w, Math.round(L * 2));
-				d.off += Math.round(L / 2); // the source stays put as the buffer moves on
-				if (d.off > RING - L * 2) d.off = Math.round(L * 2);
-				const t = this.sampleCount / sr;
-				let len = L * 0.5, rate = 1, filter = null;
-				if (v === 0) len *= 1 - act * 0.85 * (0.5 + 0.5 * Math.sin(t * 0.9)); // A: compresses and lengthens
-				if (v === 1) { rate = 0.5; const fc = 400 * Math.pow(2, act * 3 * (1 + Math.sin(t * 0.6))); filter = [F_LP, fc, fc, 1]; } // B: sub octave, filter sweeps
-				if (v === 2) { const fc = pick([250, 500, 1000, 2000]) * (1 + 0.5 * act * Math.sin(t * 0.4)); filter = [F_BP, fc, fc, 0.5 - act * 0.3]; } // C: resonant band passes (louder below)
-				if (v === 3) len *= 0.1 + 0.9 * Math.min(1, (this.sampleCount - this.lastOnset) / (L * (2 + act * 6))); // D: per note
+				const hop = Math.round(0.07 * sr);
+				this.spawnTimer = hop;
+				const off = this.w - d.src;
+				if (off < 0.02 * sr || off > RING - sr) return; // the source isn't recorded yet, or too old
+				// the micro-loop: an eighth of a step (20 to 250 ms), cycled
+				let len = clamp(L / 8, 0.02 * sr, 0.25 * sr), rate = 1, filter = null;
+				const cyc = 0.5 + 0.5 * Math.sin(2 * Math.PI * d.t * this.tempo / 60 / 8); // over 2 bars
+				if (v === 0) len *= 1 - act * 0.85 * cyc; // A: the loop compresses and lengthens
+				if (v === 1) { rate = 0.5; const fc = 180 * Math.pow(2, act * 5 * cyc + 0.5); filter = [F_LP, fc, fc, 0.7]; } // B: sub octave, filter sweeps
+				if (v === 2) { const fc = d.band * Math.pow(2, act * (cyc - 0.5)); filter = [F_BP, fc, fc, 0.5 - act * 0.3]; } // C: a resonant band pass for each note, drifting
+				if (v === 3) len *= 0.12 + 0.88 * Math.min(1, d.since / (L * (1 + act * 6))); // D: each note squeezes it, then it lengthens
+				len = Math.max(128, Math.min(len, off));
 				if (d.level > 0.003)
-					this.spawn(d.off, Math.max(256, len), rate, { loop: true, life: L * 1.2, gain: (v === 2 ? 2 : 0.5) * d.level, filter: filter, echoes: 0, flat: true });
+					this.spawn(off, len, rate, { loop: true, life: hop * 2, gain: (v === 2 ? 0.75 : 0.55) * d.level, filter: filter, echoes: 0, win: true, pan: rnd(-0.5, 0.5) });
 			}
 		}
+	}
+
+	// a grain cloud's window (HAZE, TUNNEL): raised cosine edges; SHAPE moves its weight from the
+	// start (0: a quick rise, a long fade) to the end (1: a slow swell)
+	win(t) {
+		const sh = this.s.shape;
+		let a = 0.1 + sh * 0.7, r = 0.1 + (1 - sh) * 0.7;
+		const k = a + r > 1 ? 1 / (a + r) : 1; a *= k; r *= k;
+		let e = t < a ? 0.5 - 0.5 * Math.cos(Math.PI * t / a) : 1;
+		if (t > 1 - r) e *= 0.5 - 0.5 * Math.cos(Math.PI * (1 - t) / r);
+		return e;
 	}
 
 	tick() {
@@ -402,7 +429,7 @@ class UniverseDSP {
 		this.envSlow += (a - this.envSlow) * 0.0005;
 		if (this.onsetHold > 0) this.onsetHold--;
 		else if (this.envFast > this.envSlow * 1.8 && this.envFast > 0.02 && !hold) {
-			this.onsets.push(this.w);
+			this.onsets.push(this.w - Math.round(0.004 * sr)); // a little before: the whole attack
 			if (this.onsets.length > 16) this.onsets.shift();
 			this.onsetHold = Math.round(0.08 * sr);
 			this.lastOnset = this.sampleCount;
@@ -444,7 +471,7 @@ class UniverseDSP {
 			if (g.loop) p = ((p % g.len) + g.len) % g.len;
 			let x = this.readBuf(this.bufL, g.start + p), y = this.readBuf(this.bufR, g.start + p);
 			// a short fade at the loop seam
-			if (g.loop) { const edge = Math.min(p, g.len - p) / Math.min(256, g.len * 0.25); if (edge < 1) { x *= edge; y *= edge; } }
+			if (g.loop) { const edge = Math.min(p, g.len - p) / Math.min(128, g.len * 0.15); if (edge < 1) { x *= edge; y *= edge; } }
 			if (g.crush) {
 				if (g.held-- <= 0) { g.hx = x; g.hy = y; g.held = 3; }
 				const qz = 1 << g.crush;
@@ -456,7 +483,8 @@ class UniverseDSP {
 				h = y - g.l1 - q * g.b1; g.b1 += f * h; g.l1 += f * g.b1;
 				if (g.ft === F_LP) { x = g.l0; y = g.l1; } else { x = g.b0 * q * 1.5; y = g.b1 * q * 1.5; }
 			}
-			const e = this.env(t, g.flat) * g.gain;
+			let e = (g.win ? this.win(t) : this.env(t, g.flat)) * g.gain;
+			if (g.kill) { e *= g.kill / KILL; if (--g.kill <= 0) { this.grains.splice(i, 1); continue; } }
 			wl += x * (1 - Math.max(0, g.pan)) * e;
 			wr += y * (1 + Math.min(0, g.pan)) * e;
 			g.pos += r * mod;
@@ -493,7 +521,7 @@ class UniverseDSP {
 
 		// ---- the buffer: the input (MULTIDELAY: + REPEATS, the taps fed back); HOLD freezes it ----
 		if (!hold) {
-			const fb = fx >= 9 ? s.repeats * 0.85 : 0;
+			const fb = fx >= 9 ? s.repeats * 0.85 : (fx === 3 ? s.repeats * 0.5 : 0); // MULTIDELAY: the taps fed back; HAZE: the cloud
 			this.bufL[this.w & MASK] = fastTanh(inL + wl * fb);
 			this.bufR[this.w & MASK] = fastTanh(inR + wr * fb);
 			this.w++;
